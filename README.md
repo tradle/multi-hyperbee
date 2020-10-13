@@ -8,7 +8,7 @@ But like all other components of hypercore ecosystem it is single-writer. It is 
 We are using it to create a multi writer database hence the name multi-hyperbee.
 
 ### Algorithm
-MultiHyperbee is connecting a single-writer primary hyperbee with a sparse replicas of peers hyperbees. 
+Multi-hyperbee is connecting a primary hyperbee with sparse replicas of peers' hyperbees. 
 It is written with the purpose to update primary hyperbee with all the changes from its peers' hyperbees so that it always has the full set of fresh data. 
 Each peer has exactly the same design. Their own hyperbee as a single-writer and peers hyperbees as sparse replicas.
 
