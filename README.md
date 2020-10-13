@@ -22,4 +22,4 @@ At the moment merge is simplistic - the key is updated in primary with the value
 
 There is a ping-pong loop problem with updating primary. All replicas are notified and update their primaries. Now everyone receives this update again. Apply it. And the cycle of life repeates again. And again. And again :-)
 
-We resolved the ping-pong updates loop issue with setting a '_replica' flag when applying update to a primary. 
+We resolved the ping-pong updates loop issue with setting a '_replica' flag when applying update to a primary. Each peer applying change still pongs it back to all peers, but just once. We hope to find a solution for this later. One benefit of this pong is that each peer will be able to verify that CRDT arrived at the same state across all peers.
