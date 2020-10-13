@@ -7,7 +7,6 @@ const Hyperbee = require('hyperbee')
 class MultiHyperbee extends Hyperbee {
   constructor (feed, opts = {}) {
     super(feed, opts)
-    this.name = opts.name || 'multi-hyperbee'
     this.sources = new Map()
     this.deletedsources = new Map()
   }
