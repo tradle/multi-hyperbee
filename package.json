@@ -1,0 +1,32 @@
+{
+  "name": "multi-hyperbee",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "tape test/*.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tradle/multi-hyperbee.git"
+  },
+  "keywords": [
+    "hypercore",
+    "hyperbee",
+    "crdt"
+  ],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/tradle/multi-hyperbee/issues"
+  },
+  "homepage": "https://github.com/tradle/multi-hyperbee#readme",
+  "dependencies": {
+    "hyperbee": "0.0.18"
+  },
+  "devDependencies": {
+    "random-access-memory": "^3.1.1",
+    "hypercore": "^9.5.6",
+    "tape": "^5.0.1"
+  }
+}
