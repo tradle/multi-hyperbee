@@ -17,6 +17,10 @@ Note: Sparse here means only changes are replicated
 ## Use case
 Multi-device support. One or more devices are personal cloud peers.
 
+## Cost
+Performace of reads equals the one for the hyperbee, and so is the performance of local writes.
+Updates coming from replicas are written 2 times, in sparse replica and in primary. So it also doubles storage costs, but it is not doubling the size of the database, only the size of updates made on remote peers.
+
 ## Merge
 At the moment merge is simplistic - the key is updated in primary with the value from the replica. CRDT is coming shortly to do it for real. 
 
