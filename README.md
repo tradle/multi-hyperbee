@@ -16,3 +16,10 @@ Note: Sparse here means only changes are replicated
 
 ## Use case
 Multi-device support. One or more devices are personal cloud peers.
+
+## Merge
+At the moment merge is simplistic - the key is updated in primary with the value from the replica. CRDT is coming shortly to do it for real. 
+
+There is a ping-pong loop problem with updating primary. All replicas are notified and update their primaries. Now everyone receives this update again. Apply it. And the cycle of life repeates again. And again. And again :-)
+
+We resolved the ping-pong updates loop issue with setting a '_replica' flag when applying update to a primary. 
