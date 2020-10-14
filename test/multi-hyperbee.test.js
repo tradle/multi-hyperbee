@@ -11,7 +11,7 @@ const OPTIONS = {
 test('Multihyperbee', async t => {
   const [primaryFeed, secondaryFeed] = await create({count: 2})
 
-  const primary = new MultiHyperbee(primaryFeed, {...OPTIONS, name: 'primary'})
+  const primary = new MultiHyperbee(primaryFeed, OPTIONS)
   let pkey = primaryFeed.key
 
   const cloneFeedOptions = {valueEncoding: 'json', sparse: true}
@@ -20,7 +20,7 @@ test('Multihyperbee', async t => {
   await promisifyAndExec(clonePrimaryFeed, 'ready')
   const clonePrimaryHB = new Hyperbee(clonePrimaryFeed, OPTIONS)
 
-  const secondary = new MultiHyperbee(secondaryFeed, {...OPTIONS, name: 'secondary'})
+  const secondary = new MultiHyperbee(secondaryFeed, OPTIONS)
   let skey = secondaryFeed.key
   let cloneSecondaryFeed = await createOne(skey, cloneFeedOptions)
   await promisifyAndExec(cloneSecondaryFeed, 'ready')
