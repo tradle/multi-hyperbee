@@ -1,5 +1,5 @@
 # Multi-writer hyperbee
-This repository owes its design to [@RangerMauve](https://github.com/RangerMauve)'s awesome [multi-hyperdrive](https://github.com/RangerMauve/multi-hyperdrive).
+This repository owes its design to [@RangerMauve](https://github.com/RangerMauve)'s awesome [multi-hyperdrive](https://github.com/RangerMauve/multi-hyperdrive), and of course, the very awesome [Hyperbee](https://github.com/mafintosh/hyperbee) and the [whole of Hypercore](https://hypercore-protocol.org).
 
 ## The need
 [Hyperbee](https://github.com/mafintosh/hyperbee) is a one of a kind steaming database that will change the way we work with databases. 
