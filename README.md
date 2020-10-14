@@ -88,5 +88,5 @@ multi.addHyperbee(replicaHyperbee)
 
 removes replica Hyperbee
 
-### the rest of API is the same as Hyperbee
+the rest of API is the same as [Hyperbee](https://github.com/mafintosh/hyperbee)
 
