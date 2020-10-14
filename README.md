@@ -9,14 +9,17 @@ We are using it to create a multi-writer database hence the name multi-hyperbee.
 ### Algorithm
 Multi-hyperbee is connecting a primary hyperbee with sparse replicas of peers' hyperbees. 
 It updates primary hyperbee with all the changes from its peers' hyperbees so that it always has the full set of fresh data. 
-Each peer has exactly the same design. Their own hyperbee as a single-writer and peers hyperbees as sparse replicas.
+Each peer has exactly the same design. Their own hyperbee as a single-writer and peers' hyperbees as sparse replicas.
 
-Note: Sparse here means only changes are replicated.
+Note: Sparse here means only the changes are replicated to peers.
 
-We tried to follow multi-hyperdrive algo more closely. It does not aply updates to the primary, and instead it performs on the fly checks which file is fresher, in primary or in one of the replicas, and it reads that one. 
+Design of multi-hyperbee follows multi-hyperdrive closely. The difference is that multi-hyperdrive does not aply updates to the primary, and instead it performs checks which file is fresher on the fly, in primary or in all the replicas, and then it reads that one (it also does a clever on the fly merging of directory listing requests). 
 
-So to mimic this we tried a query with a sorted union over multipe hyperbees (see tests) It avoids applying edits in primary, and it works. But in our target scenario we might have 6 replicas - iPhone, iPad, Mac, and 3 personal peers in the cloud.
-So this becomes a 6-way union which is expensive. It degrades even further, as CRDT merges will need to be performed on the fly across 6 replicas and may accumulate changes from multiple updates. And it will all be thrown away after union stream is closed. So we apply a change to primary and bear the cost of duplicating same data in primary and in replica. Unlike in multi-hyperdrive a replica is more like file metadata than a potentially 10gb file, so this cost could be ok.
+The difficulty with the database vs a filesystem is that you need to perform sorted searches. So it is not possible to check which file is fresher and return it.
+
+In our first attempt to follow multi-hyperdrive design we tried to avoid copying the data. We found a way to query the primary hyperbee and all replicas with one sorted union (see [test](https://github.com/tradle/why-hypercore/blob/master/test/hyperbeeUnion.test.js)) It avoids applying edits in primary, and it works. But in our target scenario we might have 6 replicas - iPhone, iPad, Mac, and 3 personal peers in the cloud. So this becomes a 6-way union, which is expensive. It degrades even further, as CRDT merges will need to be performed on the fly across 6 replicas and may accumulate changes from multiple updates. And it will all be thrown away after union stream is closed. 
+
+So instead we apply a change to the primary and bear the cost of duplicating the same data in primary and in replica. Unlike a multi-hyperdrive could not use this approach as it would then replicate big files. Imagine duplicating a 10gb file. But in multi-hyperbee the replica is similar to a replica of file metadata, so costs are ok.
 
 ## Use case
 Multi-device support. One or more devices are personal cloud peers.
