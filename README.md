@@ -48,7 +48,7 @@ const MultiHyperbee = require('multi-hyperbee')
 const hypercore = require('hypercore')
 const Hyperbee = require('hyperbee')
 
-const feedOpts = { value-encoding: 'json' }
+const feedOpts = { valueEncoding: 'json' }
 const hyperbeeOpts = { keyEncoding: 'utf-8', valueEncoding: 'json' }
 
 const feed = hypercore(storage, feedOpts)
