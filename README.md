@@ -43,7 +43,7 @@ We resolved the ping-pong updates loop issue with setting a '_replica' flag when
 update() event on replica occured and computer died before we applied it to primary. Will it arrive again?
 
 ## Usage
-```
+``` js
 const MultiHyperbee = require('multi-hyperbee')
 const hypercore = require('hypercore')
 const Hyperbee = require('hyperbee')
@@ -67,7 +67,7 @@ multiHyperbee.addHyperbee(replicaHyperbee)
 
 create a new MultiHyperbee with primary single-writer hypercore. 
 Options included are the same as for Hyperbee
-```
+``` js
 {
   keyEncoding: 'utf-8' | 'binary' | 'ascii', // or some abstract encoding
   valueEncoding: <same as above>
@@ -78,7 +78,7 @@ Options included are the same as for Hyperbee
 adds replica Hyperbee.
 
 Added Hyperbee should be created using replica key like this: 
-```
+``` js
 const replicaFeed = hypercore(storage, replicaKey, {...feedOpts, sparse: true})
 const replicaHyperbee = new Hyperbee(replicaFeed, hyperbeeOpts)
 multi.addHyperbee(replicaHyperbee)
