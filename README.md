@@ -52,7 +52,7 @@ const feedOpts = { value-encoding: 'json' }
 const hyperbeeOpts = { keyEncoding: 'utf-8', valueEncoding: 'json' }
 
 const feed = hypercore(storage, feedOpts)
-const multiHyperbee = new Multihyperbee(feed, hyperbeeOpts)
+const multiHyperbee = new MultiHyperbee(feed, hyperbeeOpts)
 
 // At some point replica key becomes known and the replica hyperbee can be added to receive updates on it  
 const replicaFeed = hypercore(storage, replicaKey, {...feedOpts, sparse: true})
