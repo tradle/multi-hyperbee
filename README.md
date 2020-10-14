@@ -44,7 +44,7 @@ update() event on replica occured and computer died before we applied it to prim
 
 ## Usage
 ```
-const Multihyperbee = require('Multihyperbee')
+const MultiHyperbee = require('multi-hyperbee')
 const hypercore = require('hypercore')
 const Hyperbee = require('hyperbee')
 
@@ -52,13 +52,13 @@ const feedOpts = { value-encoding: 'json' }
 const hyperbeeOpts = { keyEncoding: 'utf-8', valueEncoding: 'json' }
 
 const feed = hypercore(storage, feedOpts)
-const Multihyperbee = new Multihyperbee(feed, hyperbeeOpts)
+const multiHyperbee = new Multihyperbee(feed, hyperbeeOpts)
 
 // At some point replica key becomes known and the replica hyperbee can be added to receive updates on it  
 const replicaFeed = hypercore(storage, replicaKey, {...feedOpts, sparse: true})
 const replicaHyperbee = new Hyperbee(replicaFeed, hyperbeeOpts)
 
-Multihyperbee.addHyperbee(replicaHyperbee)
+multiHyperbee.addHyperbee(replicaHyperbee)
 
 // Multihyperbee extends Hyperbee which means the API is the same as for Hyperbee
 ```
@@ -74,7 +74,7 @@ Options included are the same as for Hyperbee
   valueEncoding: <same as above>
 }
 ```
-## multi.addHyperbee(replicaHyperbee)
+## db.addHyperbee(replicaHyperbee)
 
 adds replica Hyperbee.
 
@@ -85,7 +85,7 @@ const replicaHyperbee = new Hyperbee(replicaFeed, hyperbeeOpts)
 multi.addHyperbee(replicaHyperbee)
 ```
 
-## const replicaHyperbee = multi.removeHyperbee(replicaKey)
+## const replicaHyperbee = db.removeHyperbee(replicaKey)
 
 removes replica Hyperbee
 
