@@ -63,9 +63,9 @@ multiHyperbee.addHyperbee(replicaHyperbee)
 ```
 
 ## API
-### const db = new Multihyperbee(primaryFeed, [options])
+### const db = new MultiHyperbee(primaryFeed, [options])
 
-create a new Multihyperbee with primary single-writer hypercore. 
+create a new MultiHyperbee with primary single-writer hypercore. 
 Options included are the same as for Hyperbee
 ```
 {
