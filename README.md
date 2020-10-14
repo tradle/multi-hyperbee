@@ -60,7 +60,6 @@ const replicaHyperbee = new Hyperbee(replicaFeed, hyperbeeOpts)
 
 multiHyperbee.addHyperbee(replicaHyperbee)
 
-// Multihyperbee extends Hyperbee which means the API is the same as for Hyperbee
 ```
 
 ## API
@@ -89,5 +88,5 @@ multi.addHyperbee(replicaHyperbee)
 
 removes replica Hyperbee
 
-## the rest of API is the same as Hyperbee
+### the rest of API is the same as Hyperbee
 
