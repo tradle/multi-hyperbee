@@ -41,3 +41,53 @@ We resolved the ping-pong updates loop issue with setting a '_replica' flag when
 
 ## Failure modes
 update() event on replica occured and computer died before we applied it to primary. Will it arrive again?
+
+## Usage
+```
+const Multihyperbee = require('Multihyperbee')
+const hypercore = require('hypercore')
+const Hyperbee = require('hyperbee')
+
+const feedOpts = { value-encoding: 'json' }
+const hyperbeeOpts = { keyEncoding: 'utf-8', valueEncoding: 'json' }
+
+const feed = hypercore(storage, feedOpts)
+const Multihyperbee = new Multihyperbee(feed, hyperbeeOpts)
+
+// At some point replica key becomes known and the replica hyperbee can be added to receive updates on it  
+const replicaFeed = hypercore(storage, replicaKey, {...feedOpts, sparse: true})
+const replicaHyperbee = new Hyperbee(replicaFeed, hyperbeeOpts)
+
+Multihyperbee.addHyperbee(replicaHyperbee)
+
+// Multihyperbee extends Hyperbee which means the API is the same as for Hyperbee
+```
+
+## API
+### const db = new Multihyperbee(primaryFeed, [options])
+
+create a new Multihyperbee with primary single-writer hypercore. 
+Options included are the same as for Hyperbee
+```
+{
+  keyEncoding: 'utf-8' | 'binary' | 'ascii', // or some abstract encoding
+  valueEncoding: <same as above>
+}
+```
+## multi.addHyperbee(replicaHyperbee)
+
+adds replica Hyperbee.
+
+Added Hyperbee should be created using replica key like this: 
+```
+const replicaFeed = hypercore(storage, replicaKey, {...feedOpts, sparse: true})
+const replicaHyperbee = new Hyperbee(replicaFeed, hyperbeeOpts)
+multi.addHyperbee(replicaHyperbee)
+```
+
+## const replicaHyperbee = multi.removeHyperbee(replicaKey)
+
+removes replica Hyperbee
+
+## the rest of API is the same as Hyperbee
+
