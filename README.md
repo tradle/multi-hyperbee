@@ -28,9 +28,7 @@ Multi-device support. One or more devices are personal cloud peers.
 Performace of reads equals the one for the hyperbee, and so is the performance of local writes.
 Updates coming from replicas are written 2 times, in sparse replica and in primary. So it also doubles storage costs, but it is not doubling the size of the database, only the size of updates made on remote peers. 
 
-We could clear() storage for the KV update on replicam, but need to watch out for:
-- atomicity - make sure to only clear() after write to primary fully propagated to the underlying store
-- race condition when update from remote happens during clear()
+We could issue clear() on each new update() in replica after we apply in in primary, but need to watch out for failure modes, see below.
 
 ## Merge
 At the moment merge is simplistic - the key is updated in primary with the value from the replica. CRDT is coming shortly to do it for real. 
@@ -39,8 +37,13 @@ There is a ping-pong loop problem with updating primary. All replicas are notifi
 
 We resolved the ping-pong updates loop issue with setting a '_replica' flag when applying update to a primary. Each peer applying change still pongs it back to all peers, but just once. We hope to find a solution for this later. One benefit of this pong is that each peer will be able to verify that CRDT arrived at the same state across all peers.
 
-## Failure modes
-update() event on replica occured and computer died before we applied it to primary. Will it arrive again?
+## Failure modes discussion 
+
+- update() event on replica occured and computer died before we applied it to primary. Will it arrive again?
+- if we issue clear() on replica to avoid duplicate storage of the same record both in replica and in primary
+  - atomicity - make sure to only clear() after write to primary got fully propagated to the underlying store
+  - can hypercore handle acynchronous writes which will happen when update from remote happens during clear()
+  - If we updated the primary and machine died, clear() will not be issued. But it will not lead to inconsistency, just a bit of storage cost for the record that was not removed.
 
 ## Usage
 ``` js
