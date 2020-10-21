@@ -12,7 +12,7 @@ We are using it to create a multi-writer database hence the name multi-hyperbee.
 In the prior design we had a primary hyperbee and sparse replicas of peers' primary hyperbees. 
 In the new design the full object is not replicated, only its diff. This deisgn eliminated the ping pong problem of prior design as store is not replicated.
 
-In this design we have 2 hyperbees into which we write, one called *store*, and other called diff. Store contains full set of fresh data. Diff comtains only modifications to local objects. All peers replicate their peers' diff hyperbees (but not the store).
+In this design we have 2 hyperbees into which we write, one called *store*, and other called diff. Store contains full set of fresh data. Diff contains only modifications to local objects. All peers replicate their peers' diff hyperbees (but not the store).
 Upon diff hyperbee getting an update() event, we apply diff to the store. 
 
 For CRDT algorithm to do its magic we rewind to the proper object version and apply local diffs and a newly arrived remote diff:
