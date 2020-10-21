@@ -9,21 +9,19 @@ We are using it to create a multi-writer database hence the name multi-hyperbee.
 ### Algorithm
 *This is a third interation of the design, previous is described and implemented in the release tagged v0.1.*
 
-In prior design we had primary hyperbee and sparse replicas of peers' primary hyperbees. 
-In this design the main hyperbee, which we will call store, is not replicated. 
-Now primary hyperbee only contains diffs for all local modifications, which is replicated by peers.
-Upon the event that replica diff is updated, we apply it to the store. This way store always has the full set of fresh data. 
-Each peer has exactly the same design. Each local hyperbee as a single-writer. Collectively this design produces a multi-writer.
+In the prior design we had a primary hyperbee and sparse replicas of peers' primary hyperbees. 
+In this design we have 2 hyperbees into which we write, one called *store*, and other called diff. Store contains full set of fresh data. Diff comtains only modifications to local objects. All peers replicate their peers' diff hyperbees.
+Upon diff update() event, we apply diff to the store. 
 
-For CRDT algorithm to do its magic we apply the diffs in the following way:
+For CRDT algorithm to do its magic we rewind to the proper object version and apply local diffs and a newly arrived remote diff:
 
-- diff refers to the version of the object that was nodified on remote peer
+- remote diff refers to the version of the object that was nodified on remote peer
 - we find the same version of the object in store
 - we find all diffs that were applied locally since that version
 - we sort all local diffs and the remote diff by time, and apply them in that order
 - new version of the object is put() into store
 
-This algorithm ensures that all peers have store in exactly the same state.
+This algorithm ensures that all peers have the store in exactly the same state.
 
 Previous version of the design followed multi-hyperdrive design closely. The difference wa that multi-hyperdrive does not apply updates to the primary, and instead it performs checks which file is fresher on the fly, in primary or in all the replicas, and then it reads that one (it also does a clever on the fly merging of directory listing requests). 
 
