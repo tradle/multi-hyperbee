@@ -10,8 +10,10 @@ We are using it to create a multi-writer database hence the name multi-hyperbee.
 *This is a third interation of the design, previous is described and implemented in the release tagged v0.1.*
 
 In the prior design we had a primary hyperbee and sparse replicas of peers' primary hyperbees. 
-In this design we have 2 hyperbees into which we write, one called *store*, and other called diff. Store contains full set of fresh data. Diff comtains only modifications to local objects. All peers replicate their peers' diff hyperbees.
-Upon diff update() event, we apply diff to the store. 
+In the new design the full object is not replicated, only its diff. This deisgn eliminated the ping pong problem of prior design as store is not replicated.
+
+In this design we have 2 hyperbees into which we write, one called *store*, and other called diff. Store contains full set of fresh data. Diff comtains only modifications to local objects. All peers replicate their peers' diff hyperbees (but not the store).
+Upon diff hyperbee getting an update() event, we apply diff to the store. 
 
 For CRDT algorithm to do its magic we rewind to the proper object version and apply local diffs and a newly arrived remote diff:
 
@@ -24,14 +26,6 @@ For CRDT algorithm to do its magic we rewind to the proper object version and ap
 This algorithm ensures that all peers have the store in exactly the same state.
 
 Previous version of the design followed multi-hyperdrive design closely. The difference wa that multi-hyperdrive does not apply updates to the primary, and instead it performs checks which file is fresher on the fly, in primary or in all the replicas, and then it reads that one (it also does a clever on the fly merging of directory listing requests). 
-
-The difficulty with the database vs a filesystem is that you need to perform sorted searches. So it is not possible to check which file is fresher and return it.
-
-*In our first attempt to follow multi-hyperdrive design we tried to avoid copying the data. We found a way to query the primary hyperbee and all replicas with one sorted union (see [test](https://github.com/tradle/why-hypercore/blob/master/test/hyperbeeUnion.test.js)) It avoids applying edits in primary, and it works. But in our target scenario we might have 6 replicas - iPhone, iPad, Mac, and 3 personal peers in the cloud. So this becomes a 6-way union, which is expensive. It degrades even further, as CRDT merges will need to be performed on the fly across 6 replicas and may accumulate changes from multiple updates. And it will all be thrown away after union stream is closed. *
-
-*So instead we applied a change to the primary and bore the cost of duplicating the same data in primary and in replica. Unlike a multi-hyperdrive could not use this approach as it would then replicate big files. Imagine duplicating a 10gb file. But in multi-hyperbee the replica is similar to a replica of file metadata, so costs are ok.*
-
-With the new design, the full object is not replicated, only its diff. This deisgn eliminated the ping pong problem of prior design as store is not replicated.
 
 ## Intergrating with Hyperdrive
 
