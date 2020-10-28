@@ -7,43 +7,46 @@ But like all other components of hypercore ecosystem it is single-writer. It is 
 We are using it to create a multi-writer database hence the name multi-hyperbee.
 
 ### Algorithm
-Multi-hyperbee is connecting a primary hyperbee with sparse replicas of peers' hyperbees. 
-It updates primary hyperbee with all the changes from its peers' hyperbees so that it always has the full set of fresh data. 
-Each peer has exactly the same design. Their own hyperbee as a single-writer and peers' hyperbees as sparse replicas.
+*This is a third interation of the design, previous is described and implemented in the release tagged v0.1.*
 
-Note: Sparse here means only the changes are replicated to peers.
+In the prior design we had a primary hyperbee and sparse replicas of peers' primary hyperbees. 
+In the new design the full object is not replicated, only its diff. This deisgn eliminated the ping pong problem of prior design as store is not replicated.
 
-Design of multi-hyperbee follows multi-hyperdrive closely. The difference is that multi-hyperdrive does not aply updates to the primary, and instead it performs checks which file is fresher on the fly, in primary or in all the replicas, and then it reads that one (it also does a clever on the fly merging of directory listing requests). 
+In this design we have 2 hyperbees into which we write, one called *store*, and other called diff. Store contains full set of fresh data. Diff contains only modifications to local objects. All peers replicate their peers' diff hyperbees (but not the store).
+Upon diff hyperbee getting an update() event, we apply diff to the store. 
 
-The difficulty with the database vs a filesystem is that you need to perform sorted searches. So it is not possible to check which file is fresher and return it.
+For CRDT algorithm to do its magic we rewind to the proper object version and apply local diffs and a newly arrived remote diff:
 
-In our first attempt to follow multi-hyperdrive design we tried to avoid copying the data. We found a way to query the primary hyperbee and all replicas with one sorted union (see [test](https://github.com/tradle/why-hypercore/blob/master/test/hyperbeeUnion.test.js)) It avoids applying edits in primary, and it works. But in our target scenario we might have 6 replicas - iPhone, iPad, Mac, and 3 personal peers in the cloud. So this becomes a 6-way union, which is expensive. It degrades even further, as CRDT merges will need to be performed on the fly across 6 replicas and may accumulate changes from multiple updates. And it will all be thrown away after union stream is closed. 
+- remote diff refers to the version of the object that was nodified on remote peer
+- we find the same version of the object in store
+- we find all diffs that were applied locally since that version
+- we sort all local diffs and the remote diff by time, and apply them in that order
+- new version of the object is put() into store
 
-So instead we apply a change to the primary and bear the cost of duplicating the same data in primary and in replica. Unlike a multi-hyperdrive could not use this approach as it would then replicate big files. Imagine duplicating a 10gb file. But in multi-hyperbee the replica is similar to a replica of file metadata, so costs are ok.
+This algorithm ensures that all peers have the store in exactly the same state.
+
+Previous version of the design followed multi-hyperdrive design closely. The difference wa that multi-hyperdrive does not apply updates to the primary, and instead it performs checks which file is fresher on the fly, in primary or in all the replicas, and then it reads that one (it also does a clever on the fly merging of directory listing requests). 
+
+## Intergrating with Hyperdrive
+
+- file diff feed in CRDT format (each change could be quite big)
+- CRDT diff is applied to a local file (TBD: must apply to local hyperdrive but this creates a ping pong problem)
 
 ## Use case
 Multi-device support. One or more devices are personal cloud peers.
 
 ## Cost and future optimizations
-Performace of reads equals the one for the hyperbee, and so is the performance of local writes.
-Updates coming from replicas are written 2 times, in sparse replica and in primary. So it also doubles storage costs, but it is not doubling the size of the database, only the size of updates made on remote peers. 
-
-We could issue clear() on each new update() in replica after we apply in in primary, but need to watch out for failure modes, see below.
-
-## Merge
-At the moment merge is simplistic - the key is updated in primary with the value from the replica. CRDT is coming shortly to do it for real. 
-
-There is a ping-pong loop problem with updating primary. All replicas are notified and update their primaries. Now everyone receives this update again. Apply it. And the cycle of life repeates again. And again. And again :-)
-
-We resolved the ping-pong updates loop issue with setting a '_replica' flag when applying update to a primary. Each peer applying change still pongs it back to all peers, but just once. We hope to find a solution for this later. One benefit of this pong is that each peer will be able to verify that CRDT arrived at the same state across all peers.
+**Read performance**: equals normal hyperbee performance
+**Write performance**: quite expensive:
+- Diff coming from replica is written
+- Union range query across all diff replicas and primary diff to find diffs since a particualr HLC time
+- Reed matching version of the object in store
+- Merge in memory and Write new version to store
 
 ## Failure modes discussion 
 
-- update() event on replica occured and computer died before we applied it to primary. Will it arrive again?
-- if we issue clear() on replica to avoid duplicate storage of the same record both in replica and in primary
-  - atomicity - make sure to only clear() after write to primary got fully propagated to the underlying store
-  - can hypercore handle acynchronous writes which will happen when update from remote happens during clear()
-  - If we updated the primary and machine died, clear() will not be issued. But it will not lead to inconsistency, just a bit of storage cost for the record that was not removed.
+- update() event on replica occured and computer died before we applied it to store. Will it arrive again?
+- HLC clock needs to be restored on restart
 
 ## Usage
 ``` js
