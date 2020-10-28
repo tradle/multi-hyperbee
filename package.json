@@ -22,7 +22,10 @@
   },
   "homepage": "https://github.com/tradle/multi-hyperbee#readme",
   "dependencies": {
-    "hyperbee": "0.0.18"
+    "automerge": "^0.14.1",
+    "hyperbee": "0.0.18",
+    "lodash": "^4.17.20",
+    "sorted-union-stream": "^3.0.1"
   },
   "devDependencies": {
     "random-access-memory": "^3.1.1",

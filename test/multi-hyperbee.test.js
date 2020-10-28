@@ -1,86 +1,182 @@
 const test = require('tape')
 const Hyperbee = require('hyperbee')
-const { promisifyAndExec, create, createOne } = require('./helpers')
+const ram = require('random-access-memory')
+const isEqual = require('lodash/isEqual')
+const cloneDeep = require('lodash/cloneDeep')
+
 const MultiHyperbee = require('../')
+const { promisifyAndExec, create, createOne, delay } = require('./helpers')
+var { object0, object1, object1_1, object2,
+        diff0, diff1, diff1_1, diff2 } = require('./constants')
 
 const OPTIONS = {
         keyEncoding: 'utf-8',
-        valueEncoding: 'json'
+        valueEncoding: 'json',
       }
 
-test('Multihyperbee', async t => {
-  const [primaryFeed, secondaryFeed] = await create({count: 2})
+test('Multihyperbee - autogen Diff object', async t => {
+  const multiHBs = await setupReplChannel(2)
+  const [ primary, secondary ] = multiHBs
 
-  const primary = new MultiHyperbee(primaryFeed, OPTIONS)
-  let pkey = primaryFeed.key
-
-  const cloneFeedOptions = {valueEncoding: 'json', sparse: true}
-
-  const clonePrimaryFeed = await createOne(pkey, cloneFeedOptions)
-  await promisifyAndExec(clonePrimaryFeed, 'ready')
-  const clonePrimaryHB = new Hyperbee(clonePrimaryFeed, OPTIONS)
-
-  const secondary = new MultiHyperbee(secondaryFeed, OPTIONS)
-  let skey = secondaryFeed.key
-  let cloneSecondaryFeed = await createOne(skey, cloneFeedOptions)
-  await promisifyAndExec(cloneSecondaryFeed, 'ready')
-
-  const cloneSecondaryHB = new Hyperbee(cloneSecondaryFeed, OPTIONS)
-
-  primary.addHyperbee(cloneSecondaryHB)
-  secondary.addHyperbee(clonePrimaryHB)
-
-  let stream = secondaryFeed.replicate(false, {live: true})
-  stream.pipe(cloneSecondaryFeed.replicate(true, {live: true})).pipe(stream)
-
-
-  let pstream = primaryFeed.replicate(false, {live: true})
-  pstream.pipe(clonePrimaryFeed.replicate(true, {live: true})).pipe(pstream)
-
-  await primary.put('a', {})
-  await secondary.put('b', {})
-  await secondary.put('c', {})
-  await secondary.put('d', {})
-
-  secondary.put('a', {s: 1})
-  let toVal = [
-    {key: 'b', value: {}},
-    {key: 'c', value: {}},
-    {key: 'd', value: {}},
-    {key: 'a', value: {}}
-  ]
-  let secCounter = toVal.length
-  let prCounter = toVal.length
-
-  let sec = secondary.createReadStream()
-  await new Promise((resolve, reject) => {
-    sec.on('data', (data) => {
-      console.log(data)
-      delete data.seq
-      delete data.value._replica
-      let idx = toVal.findIndex(e => e.key === data.key)
-      t.same(data, toVal[idx])
-      secCounter--
+  await put(primary, diff0, object0)
+await delay(100)
+  await put(primary, null, object1)
+  let storeArr = [object0, object1]
+  for (let i=0; i<multiHBs.length; i++) {
+    let multiHB = multiHBs[i]
+    let counter = storeArr.length
+    let sec = multiHB.createHistoryStream()
+    await new Promise((resolve, reject) => {
+      sec.on('data', ({value}) => {
+        // console.log(multiHB.author + ' ' + JSON.stringify(data, null, 2))
+        delete value._timestamp
+        delete value._prevTimestamp
+        let v = storeArr.find(val => isEqual(val, value))
+        t.same(value, v)
+        counter--
+      })
+      sec.on('end', (data) => {
+        if (counter)
+          t.fail()
+        resolve()
+      })
     })
-    sec.on('end', (data) => {
+    await delay(1000)
+  }
+
+  let diffArr = [diff0, diff1]
+  let hbDiff = primary.getDiffHyperbee().createHistoryStream()
+  await new Promise((resolve, reject) => {
+    hbDiff.on('data', ({value}) => {
+      delete value._timestamp
+      delete value.obj._prevTimestamp
+      t.same(value, diffArr[0])
+      diffArr.shift()
+    })
+    hbDiff.on('end', (data) => {
+      if (diffArr.length)
+        t.fail()
       resolve()
     })
   })
-  let ps = primary.createReadStream()
-  await new Promise((resolve, reject) => {
-    ps.on('data', (data) => {
-      console.log(data)
-      delete data.seq
-      delete data.value._replica
-      let idx = toVal.findIndex(e => e.key === data.key)
-      t.same(data, toVal[idx])
-      prCounter--
+  t.end()
+})
+test('Multihyperbee - crdt with 3 MultiHyperbees - automerge', async t => {
+  const multiHBs = await setupReplChannel(3)
+  const [ primary, secondary, tertiary ] = multiHBs
+
+  // The delays are artificial. Without them the mesages get lost for some reason
+  await put(primary, diff0, object0)
+await delay(100)
+  await put(primary, diff1, object1)
+await delay(100)
+  await put(secondary, diff1_1, object1_1)
+await delay(100)
+  await put(secondary, diff2, object2)
+await delay(100)
+  let storeArr = [object0, object1, object1_1, object2]
+  for (let i=0; i<multiHBs.length; i++) {
+    let multiHB = multiHBs[i]
+    let counter = storeArr.length
+    let sec = multiHB.createHistoryStream()
+    await new Promise((resolve, reject) => {
+      sec.on('data', ({value}) => {
+        // console.log(multiHB.name + ' ' + JSON.stringify(data, null, 2))
+        delete value._timestamp
+        delete value._prevTimestamp
+        let v = storeArr.find(val => isEqual(val, value))
+        t.same(value, v)
+        counter--
+      })
+      sec.on('end', (data) => {
+        if (counter) {
+          debugger
+          t.fail()
+        }
+        resolve()
+      })
     })
-    ps.on('end', (data) => {
-      resolve()
+    await delay(1000)
+  }
+  let diffArr = [diff0, diff1, diff1_1, diff2]
+
+  let secDiff = secondary.getDiffHyperbee().createHistoryStream()
+  let primDiff = primary.getDiffHyperbee().createHistoryStream()
+  let arr = [primDiff, secDiff]
+  for (let i=0; i<arr.length; i++) {
+    let diff = arr[i]
+    await new Promise((resolve, reject) => {
+      diff.on('data', ({value}) => {
+        // console.log(secondary.name + 'Diff ' + JSON.stringify(data, null, 2))
+        delete value._timestamp
+        delete value.obj._prevTimestamp
+        t.same(value, diffArr[0])
+        diffArr.shift()
+      })
+      diff.on('end', (data) => {
+        resolve()
+      })
     })
-  })
-  if (prCounter  ||  secCounter)
+  }
+
+  if (diffArr.length)
     t.fail()
   t.end()
 })
+
+async function setupReplChannel(count) {
+  const stores = await create({count, persistent: false, name: 'storeFeed'})
+
+  let names = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
+  const feedOptions = {valueEncoding: 'json'}
+  let multiHBs = []
+  let cloneHBs = []
+  for (let i=0; i<count; i++) {
+    const store = stores[i]
+
+    let diffStoreDir = store._storage.key.directory
+    if (diffStoreDir)
+      diffStoreDir += '_diff'
+    else
+      diffStoreDir = ram
+
+    let [ diffFeed ] = await create({count: 1, name: diffStoreDir})
+
+    let diffHyperbee = new Hyperbee(diffFeed, OPTIONS)
+
+    const multiHB = await new MultiHyperbee({feed: store, diffHyperbee, opts: {...OPTIONS, name: names[i] }})
+    multiHBs.push(multiHB)
+
+    // debugger
+    const diffKey = diffFeed.key
+    const cloneFeed = await createOne(diffKey, feedOptions, 'clonePrimary')
+    await promisifyAndExec(cloneFeed, 'ready')
+
+    const cloneHB = new Hyperbee(cloneFeed, OPTIONS)
+    cloneHBs.push(cloneHB)
+
+    let pstream = diffFeed.replicate(false, {live: true})
+    pstream.pipe(cloneFeed.replicate(true, {live: true})).pipe(pstream)
+  }
+  for (let i=0; i<multiHBs.length; i++) {
+    let cur = i
+    let j = 0
+    let multiHB = multiHBs[i]
+    for (; j<cur; j++)
+      multiHB.addHyperbee(cloneHBs[j])
+    for (++j; j<multiHBs.length; j++)
+      multiHB.addHyperbee(cloneHBs[j])
+  }
+
+  return multiHBs
+}
+
+async function put(hyperbee, diff, value) {
+  // debugger
+  let key = `${value._objectId}`
+  let val = cloneDeep(value)
+  if (diff)
+    val._diff = cloneDeep(diff)
+
+  await hyperbee.put(key, val)
+}
