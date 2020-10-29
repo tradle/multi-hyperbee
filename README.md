@@ -58,13 +58,13 @@ const feedOpts = { valueEncoding: 'json' }
 const hyperbeeOpts = { keyEncoding: 'utf-8', valueEncoding: 'json' }
 async init() {
   ...
-  // Store
-  const feed = hypercore(storage, feedOpts)
   // Diff
   const diffFeed = hypercore(diffStorage, feedOpts)
   const diffHyperbee = new Hyperbee(diffFeed, hyperbeeOpts)
   await diffHyperbee.ready()
 
+  // Store
+  const feed = hypercore(storage, feedOpts)
   const multiHyperbee = new MultiHyperbee(feed, {diffHyperbee, opts: hyperbeeOpts})
 }
 
