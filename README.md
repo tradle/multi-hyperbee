@@ -27,20 +27,18 @@ This algorithm ensures that all peers have the store in exactly the same state.
 
 Previous version of the design followed multi-hyperdrive design closely. The difference wa that multi-hyperdrive does not apply updates to the primary, and instead it performs checks which file is fresher on the fly, in primary or in all the replicas, and then it reads that one (it also does a clever on the fly merging of directory listing requests). 
 
-## Intergrating with Hyperdrive
-
-- file diff feed in CRDT format (each change could be quite big)
-- CRDT diff is applied to a local file (TBD: must apply to local hyperdrive but this creates a ping pong problem)
+## Intergrating with Hyperdrive (planned)
+- file diff feed in CRDT format (each change could be quite big, so may need a separate diff feed)
+- TBD: CRDT diff must apply to a local hyperdrive, but this creates a ping pong problem
 
 ## Use cases
 - Multi-device support. One or more devices are personal cloud peers.
 - Later we will consider a shared DB for a team 
 
-
 ## Cost and future optimizations
 **Read performance**: equals normal hyperbee performance
 **Write performance**: quite expensive:
-- Diff coming from replica is written
+- Diff coming from replica is written to disk
 - Union range query across all diff replicas and primary diff to find diffs since a particualr HLC time
 - Reed matching version of the object in store
 - Merge in memory and Write new version to store
@@ -60,34 +58,34 @@ const feedOpts = { valueEncoding: 'json' }
 const hyperbeeOpts = { keyEncoding: 'utf-8', valueEncoding: 'json' }
 async init() {
   ...
-  // Diff
+  // Diff feed. In the future this feed may receive diffs from multiple bees, tries and drives
   const diffFeed = hypercore(diffStorage, feedOpts)
   const diffHyperbee = new Hyperbee(diffFeed, hyperbeeOpts)
   await diffHyperbee.ready()
 
-  // Store
+  // Store. Local database which will be kept in sync with remote peers via the the diff feed
   const feed = hypercore(storage, feedOpts)
   const multiHyperbee = new MultiHyperbee(feed, {diffHyperbee, opts: hyperbeeOpts})
 }
 
-// At some point replica key becomes known and the replica hyperbee can be added to receive updates on it  
+// Each app usually has its own key exchange mechanism with remote peers ...
+// To receive updates, add remote peer's diff feed. Repeat for all remote peers.
 {
   ...
-  const replicaFeed = hypercore(replicaStorage, replicaKey, {...feedOpts, sparse: true})
-  const replicaHyperbee = new Hyperbee(replicaFeed, hyperbeeOpts)
-  await replicaHyperbee.ready()
+  const peerDiffFeed = hypercore(replicaStorage, peerDiffFeedKey, {...feedOpts})
+  const peerDiff = new Hyperbee(peerDiffFeed, hyperbeeOpts)
+  await peerDiff.ready()
 
-  multiHyperbee.addHyperbee(replicaHyperbee)
+  multiHyperbee.addHyperbee(peerDiff)
 }  
 ```
 
 ## API
-### const db = new MultiHyperbee(primaryFeed, {diffHyperbee, [options]})
+### const db = new MultiHyperbee(feed, {peerDiff, [options]})
 
-create a new MultiHyperbee with two single-writer hypercores: 
-- **Store** - not replicated hypercore for saving all the versions of all the objects. 
-- **Diff** - sparsely replicated, for exchanging only the changes with other devices MulteHyperbees. 
-
+creates a new MultiHyperbee with two single-writer hypercores: 
+- **Store** - a hyperbee into which we will store objects created/changed locally or received from peers. This hyperbee is not replicated to peers. Multi-hyperbee's main goal is to keep this store in exactly the same state as store on other peers
+- **Diff** - here we store all changes made locally. Other peers replicate this and merge each diff into their own store.
 Options included:
 ``` js
 {
