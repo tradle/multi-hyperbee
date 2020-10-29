@@ -68,7 +68,7 @@ class MultiHyperbee extends Hyperbee {
     for (let s in this.sources) {
       let hb  = this.sources[s]
       sortedStreams.push(
-        hb.createReadStream({ gte: key, lte: key.split('/').splice(0, 2).join('/') })
+        hb.createReadStream({ gte: key, lte: key.split('/').splice(0, -1).join('/') })
       )
     }
     if (sortedStreams.length === 1)
@@ -111,6 +111,9 @@ class MultiHyperbee extends Hyperbee {
   }
   async _put(key, value) {
     await this.put(key, value, true)
+  }
+  batch() {
+    throw new Error('Not supported yet')
   }
   _genDiff(key, newValue, oldValue) {
     if (!oldValue)
