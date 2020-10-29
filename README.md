@@ -156,6 +156,11 @@ It is used by mergeHandler for applying changes to the Store object when for exa
 
 the rest of API is the same as [Hyperbee](https://github.com/mafintosh/hyperbee)
 
-### Limittations
+### Limitations
 
 **batch** is not yet supported
+
+### Punch list
+
+MH - generate diff for insert/remove to array changes
+
