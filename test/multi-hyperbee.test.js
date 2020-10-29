@@ -128,7 +128,7 @@ async function setupReplChannel(count) {
   const stores = await create({count, persistent: false, name: 'storeFeed'})
 
   let names = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
-  const feedOptions = {valueEncoding: 'json', sparse: true}
+  const feedOptions = {valueEncoding: 'json'}
   let multiHBs = []
   let cloneHBs = []
   for (let i=0; i<count; i++) {
