@@ -144,7 +144,7 @@ async function setupReplChannel(count) {
 
     let diffHyperbee = new Hyperbee(diffFeed, OPTIONS)
 
-    const multiHB = await new MultiHyperbee({feed: store, diffHyperbee, opts: {...OPTIONS, name: names[i] }})
+    const multiHB = await new MultiHyperbee(store, { diffHyperbee, opts: {...OPTIONS, name: names[i] }})
     multiHBs.push(multiHB)
 
     // debugger

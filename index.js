@@ -11,7 +11,7 @@ const { Timestamp, MutableTimestamp } = require('./timestamp')()
 // This implementation uses HLC Clock implemented by James Long in his crdt demo app
 
 class MultiHyperbee extends Hyperbee {
-  constructor ({feed, diffHyperbee, opts={}, customMergeHandler}) {
+  constructor (feed, { diffHyperbee, opts={}, customMergeHandler}) {
     if (!diffHyperbee)
       throw new Error('diffHyperbee - is a required option')
 
