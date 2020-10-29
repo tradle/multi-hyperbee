@@ -12,11 +12,12 @@ const { Timestamp, MutableTimestamp } = require('./timestamp')()
 
 class MultiHyperbee extends Hyperbee {
   constructor (feed, { diffHyperbee, opts={}, customMergeHandler}) {
-    if (!diffHyperbee)
-      throw new Error('diffHyperbee - is a required option')
+    // if (!diffHyperbee)
+    //   throw new Error('diffHyperbee - is a required option')
 
     super(feed, opts)
     this.name = opts.name || ''
+
     this.diffHyperbee = diffHyperbee
 
     this.mergeHandler =  customMergeHandler && customMergeHandler || mergeHandler
@@ -29,6 +30,11 @@ class MultiHyperbee extends Hyperbee {
     return this.diffHyperbee
   }
   async put(key, value, noDiff) {
+    if (!this.diffHyperbee) {
+      super.put(key, value)
+      return
+    }
+
     if (!value)
       throw new Error('multi-hyperbee: value parameter is required')
     if (!value._objectId)
@@ -62,6 +68,9 @@ class MultiHyperbee extends Hyperbee {
     await this.diffHyperbee.put(`${key}/${timestamp}`, diff)
   }
   createUnionStream(key) {
+    if (!this.diffHyperbee)
+      throw new Error('Works only with Diff hyperbee')
+
     if (!key)
       throw new Error('Key is expected')
     let sortedStreams = []
@@ -81,6 +90,9 @@ class MultiHyperbee extends Hyperbee {
     return union
   }
   addHyperbee(hyperbee) {
+    if (!this.diffHyperbee)
+      throw new Error('Works only with Diff hyperbee')
+
     const keyString = hyperbee.feed.key.toString('hex')
     this.sources[keyString] = hyperbee
 // console.log(`Add hyperbee to ${this.name}: ${keyString}`)
@@ -91,6 +103,9 @@ class MultiHyperbee extends Hyperbee {
   }
 
   removeHyperbee (key) {
+    if (!this.diffHyperbee)
+      throw new Error('Works only with Diff hyperbee')
+
     const keyString = key.toString('hex')
     const hyperbee = this.sources[keyString]
 
@@ -100,6 +115,12 @@ class MultiHyperbee extends Hyperbee {
     this.deletedSources[keyString] = hyperbee
 
     return hyperbee
+  }
+  batch() {
+    if (!this.diffHyperbee)
+      return super.batch()
+
+    throw new Error('Not supported yet')
   }
 
   _parseTimestamp(timestamp) {
@@ -111,9 +132,6 @@ class MultiHyperbee extends Hyperbee {
   }
   async _put(key, value) {
     await this.put(key, value, true)
-  }
-  batch() {
-    throw new Error('Not supported yet')
   }
   _genDiff(key, newValue, oldValue) {
     if (!oldValue)
