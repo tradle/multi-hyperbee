@@ -29,6 +29,10 @@ class MultiHyperbee extends Hyperbee {
     return this.diffHyperbee
   }
   async put(key, value, noDiff) {
+    if (!value)
+      throw new Error('multi-hyperbee: value parameter is required')
+    if (!value._objectId)
+      value._objectId = key
     let timestamp = value._timestamp
     if (!timestamp)
       timestamp = Timestamp.send(this.clock.getClock()).toString().slice(0, 29)
@@ -57,7 +61,7 @@ class MultiHyperbee extends Hyperbee {
       diff.obj._prevTimestamp = prevTimestamp
     await this.diffHyperbee.put(`${key}/${timestamp}`, diff)
   }
-  createUnionStream(key, reverse) {
+  createUnionStream(key) {
     if (!key)
       throw new Error('Key is expected')
     let sortedStreams = []
