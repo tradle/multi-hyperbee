@@ -32,8 +32,10 @@ Previous version of the design followed multi-hyperdrive design closely. The dif
 - file diff feed in CRDT format (each change could be quite big)
 - CRDT diff is applied to a local file (TBD: must apply to local hyperdrive but this creates a ping pong problem)
 
-## Use case
-Multi-device support. One or more devices are personal cloud peers.
+## Use cases
+- Multi-device support. One or more devices are personal cloud peers.
+- Later we will consider a shared DB for a team 
+
 
 ## Cost and future optimizations
 **Read performance**: equals normal hyperbee performance
