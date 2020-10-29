@@ -1,21 +1,19 @@
 # Multi-writer hyperbee
-This repository owes its design to [@RangerMauve](https://github.com/RangerMauve)'s awesome [multi-hyperdrive](https://github.com/RangerMauve/multi-hyperdrive), and of course, the very awesome [Hyperbee](https://github.com/mafintosh/hyperbee) and the [whole of Hypercore](https://hypercore-protocol.org).
+This repository owes origins of its design to [@RangerMauve](https://github.com/RangerMauve)'s awesome [multi-hyperdrive](https://github.com/RangerMauve/multi-hyperdrive), and of course, the very awesome [Hyperbee](https://github.com/mafintosh/hyperbee) and the [whole of Hypercore](https://hypercore-protocol.org).
 
 ## The need
-[Hyperbee](https://github.com/mafintosh/hyperbee) is a one of a kind steaming database that will change the way we work with databases. 
-But like all other components of hypercore ecosystem it is single-writer. It is not a deficiency, it's just a lower level abstraction. 
-We are using it to create a multi-writer database hence the name multi-hyperbee.
+[Hyperbee](https://github.com/mafintosh/hyperbee) is one-of-a-kind steaming database that can change the way we work with the databases. But like all other low-level components of hypercore ecosystem it is a single-writer data structure. Multi-writer is a higher-level abstraction, hence the name multi-hyperbee.
 
 ### Algorithm
 *This is a third interation of the design, previous is described and implemented in the release tagged v0.1.*
 
-In the prior design we had a primary hyperbee and sparse replicas of peers' primary hyperbees. 
-In the new design the full object is not replicated, only its diff. This deisgn eliminated the ping pong problem of prior design as store is not replicated.
+In the prior design we had a primary hyperbee and sparse replicas of other peers' primary hyperbees. 
+In the new design the full object is not replicated to the peers, only its diff (this design eliminated the ping-pong problem of the prior design as the store is not replicated).
 
-In this design we have 2 hyperbees into which we write, one called *store*, and other called diff. Store contains full set of fresh data. Diff contains only modifications to local objects. All peers replicate their peers' diff hyperbees (but not the store).
+In this design we have 2 hyperbees into which we write, `store` and `diff`. Store contains a full set of fresh objects (and their older versions, as does any hypercore). Diff contains only the specially formatted  objects (our custom CRDT format) that represent modifications to local objects. Every peer replicates other peers' diff hyperbees (but not the store).
 Upon diff hyperbee getting an update() event, we apply diff to the store. 
 
-For CRDT algorithm to do its magic we rewind to the proper object version and apply local diffs and a newly arrived remote diff:
+For the CRDT algorithm to do its magic, we first rewind to the proper object version and then apply local diffs and a newly arrived remote diff:
 
 - remote diff refers to the version of the object that was nodified on remote peer
 - we find the same version of the object in store
@@ -58,7 +56,8 @@ const feedOpts = { valueEncoding: 'json' }
 const hyperbeeOpts = { keyEncoding: 'utf-8', valueEncoding: 'json' }
 async init() {
   ...
-  // Diff feed. In the future this feed may receive diffs from multiple bees, tries and drives
+  // Diff feed. We will write here all changes.
+  // In the future this feed may receive diffs from multiple bees, tries and drives
   const diffFeed = hypercore(diffStorage, feedOpts)
   const diffHyperbee = new Hyperbee(diffFeed, hyperbeeOpts)
   await diffHyperbee.ready()
@@ -68,8 +67,8 @@ async init() {
   const multiHyperbee = new MultiHyperbee(feed, {diffHyperbee, opts: hyperbeeOpts})
 }
 
-// Each app usually has its own key exchange mechanism with remote peers ...
-// To receive updates, add remote peer's diff feed. Repeat for all remote peers.
+// Each app usually has its own key exchange mechanism with remote peers. So after exchange is completed, 
+// we know the keys of the peer's diff feeds. To receive updates from them, you need to add them here. Repeat for all remote peers.
 {
   ...
   const peerDiffFeed = hypercore(replicaStorage, peerDiffFeedKey, {...feedOpts})
@@ -84,7 +83,7 @@ async init() {
 ### const db = new MultiHyperbee(feed, {peerDiff, [options]})
 
 creates a new MultiHyperbee with two single-writer hypercores: 
-- **Store** - a hyperbee into which we will store objects created/changed locally or received from peers. This hyperbee is not replicated to peers. Multi-hyperbee's main goal is to keep this store in exactly the same state as store on other peers
+- **Store** - a hyperbee into which we will store objects created/changed locally or received from peers. This hyperbee is not replicated to peers. Multi-hyperbee's main goal is to achieve convergence, that is to keep this store in exactly the same state as store on other peers. This can't happen synchronously as peers are not expected to be only all the time, but eventually.
 - **Diff** - here we store all changes made locally. Other peers replicate this and merge each diff into their own store.
 Options included:
 ``` js
