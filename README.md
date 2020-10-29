@@ -4,6 +4,10 @@ This repository owes origins of its design to [@RangerMauve](https://github.com/
 ## The need
 [Hyperbee](https://github.com/mafintosh/hyperbee) is one-of-a-kind steaming database that can change the way we work with the databases. But like all other low-level components of hypercore ecosystem it is a single-writer data structure. Multi-writer is a higher-level abstraction, hence the name multi-hyperbee.
 
+## Use cases
+- Multi-device support. One or more devices are personal cloud peers.
+- Later we will consider a shared DB for a team 
+
 ### Algorithm
 *This is a third interation of the design, previous is described and implemented in the release tagged v0.1.*
 
@@ -25,13 +29,14 @@ This algorithm ensures that all peers have the store in exactly the same state.
 
 Previous version of the design followed multi-hyperdrive design closely. The difference wa that multi-hyperdrive does not apply updates to the primary, and instead it performs checks which file is fresher on the fly, in primary or in all the replicas, and then it reads that one (it also does a clever on the fly merging of directory listing requests). 
 
-## Intergrating with Hyperdrive (planned)
+## Roadmap 
+- Support multiple bees, tries. We invision that peers will use one replication log to establish multi-writer for any number of shared data structures, that is for data structures local and remote peers can write into simultaneously.
+
+- Tighten the non-atomic failure modes when process dies after writing to `diff` and before writing to `store`, or after reading from `feed` and applying to `store'.
+
+### Intergrating with Hyperdrive (planned)
 - file diff feed in CRDT format (each change could be quite big, so may need a separate diff feed)
 - TBD: CRDT diff must apply to a local hyperdrive, but this creates a ping pong problem
-
-## Use cases
-- Multi-device support. One or more devices are personal cloud peers.
-- Later we will consider a shared DB for a team 
 
 ## Cost and future optimizations
 **Read performance**: equals normal hyperbee performance
