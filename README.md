@@ -97,7 +97,7 @@ creates a new MultiHyperbee with two single-writer hypercores:
 Options included:
 ``` js
 {
-  diffHyperbee, // required - should be hyperbee
+  diffHyperbee, // if not present will work as regular single-write Hyperbee
   // other options
   opts: { // Same as for Hyperbee
     keyEncoding: 'utf-8' | 'binary' | 'ascii', // or some abstract encoding
