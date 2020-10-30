@@ -103,7 +103,7 @@ Options included:
     keyEncoding: 'utf-8' | 'binary' | 'ascii', // or some abstract encoding
     valueEncoding: <same as above>
   },
-  customeMergeHandler // CRDT handler to apply changes to the Object
+  customMergeHandler // CRDT handler to apply changes to the Object
 }
 ```
 ### db.put(key, storeValue)
