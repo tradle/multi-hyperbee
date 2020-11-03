@@ -58,38 +58,19 @@ To implement CRDT for Hyperdrive files, we might need to change multi-hyperdrive
 ## Usage
 ``` js
 const MultiHyperbee = require('multi-hyperbee')
-const hypercore = require('hypercore')
-const Hyperbee = require('hyperbee')
 
-const feedOpts = { valueEncoding: 'json' }
 const hyperbeeOpts = { keyEncoding: 'utf-8', valueEncoding: 'json' }
-async init() {
-  ...
-  // Diff feed. We will write here all changes.
-  // In the future this feed may receive diffs from multiple bees, tries and drives
-  const diffFeed = hypercore(diffStorage, feedOpts)
-  const diffHyperbee = new Hyperbee(diffFeed, hyperbeeOpts)
-  await diffHyperbee.ready()
-
-  // Store. Local database which will be kept in sync with remote peers via the the diff feed
-  const feed = hypercore(storage, feedOpts)
-  const multiHyperbee = new MultiHyperbee(feed, {diffHyperbee, opts: hyperbeeOpts})
-}
+const multiHyperbee = new MultiHyperbee(storage, { hyperbeeOpts })
 
 // Each app usually has its own key exchange mechanism with remote peers. So after exchange is completed, 
-// we know the keys of the peer's diff feeds. To receive updates from them, you need to add them here. Repeat for all remote peers.
+// we will know the keys of the peer's diff feeds. To receive updates from them, you need to add them here. Repeat for all remote peers.
 {
-  ...
-  const peerDiffFeed = hypercore(replicaStorage, peerDiffFeedKey, {...feedOpts})
-  const peerDiff = new Hyperbee(peerDiffFeed, hyperbeeOpts)
-  await peerDiff.ready()
-
-  multiHyperbee.addHyperbee(peerDiff)
+  await multiHyperbee.addPeer(peerDiffFeedKey)
 }  
 ```
 
 ## API
-### const db = new MultiHyperbee(feed, {peerDiff, [options]})
+### const db = new MultiHyperbee(storage, [options], [customMergeHandler])
 
 creates a new MultiHyperbee with two single-writer hypercores: 
 - **Store** - a hyperbee into which we will store objects created/changed locally or received from peers. This hyperbee is not replicated to peers. Multi-hyperbee's main goal is to achieve convergence, that is to keep this store in exactly the same state as store on other peers. This can't happen synchronously as peers are not expected to be only all the time, but eventually.
@@ -97,16 +78,13 @@ creates a new MultiHyperbee with two single-writer hypercores:
 Options included:
 ``` js
 {
-  diffHyperbee, // if not present will work as regular single-write Hyperbee
-  // other options
-  opts: { // Same as for Hyperbee
-    keyEncoding: 'utf-8' | 'binary' | 'ascii', // or some abstract encoding
-    valueEncoding: <same as above>
-  },
-  customMergeHandler // CRDT handler to apply changes to the Object
+  keyEncoding: 'utf-8' | 'binary' | 'ascii', // or some abstract encoding
+  valueEncoding: <same as above>
 }
 ```
-### db.put(key, storeValue)
+**customMergeHandler** - CRDT handler to apply changes to the Object.
+
+### await db.put(key, storeValue)
 
 Put will write two objects at the same time to Store and to Diff hyperbee.
 Put will add to each of the objects following properties:
@@ -131,22 +109,15 @@ Diff object that is written to diffHyperbee will have a key that is consists of 
 - storeValue key
 - storeValue timestamp
 
-## db.addHyperbee(replicaHyperbee)
+## const replicaPeer = await db.addPeer(replicaKey)
 
-adds replica Hyperbee.
+Created replica Hyperbee using replica key 
 
-Added Hyperbee should be created using replica key like this: 
-``` js
-const replicaFeed = hypercore(storage, replicaKey, {...feedOpts, sparse: true})
-const replicaHyperbee = new Hyperbee(replicaFeed, hyperbeeOpts)
-multi.addHyperbee(replicaHyperbee)
-```
-
-## const replicaHyperbee = db.removeHyperbee(replicaKey)
+## const replicaPeer = db.removePeer(replicaKey)
 
 removes replica Hyperbee
 
-## stream = db.createUnionStream(key)
+## const stream = db.createUnionStream(key)
 
 Use it for writing your own custom merge handler.
 It creates a union stream from all the replica hyperbees where all the entries are the Diff objects. 
