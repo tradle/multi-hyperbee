@@ -113,17 +113,17 @@ class MultiHyperbee extends Hyperbee {
     let { valueEncoding } = this.options
     let peerFeed = hypercore(peerStorage, key)
 
-    let peerHyperbee = new Hyperbee(peerFeed, this.options)
-    await peerHyperbee.ready()
+    let peer = new Hyperbee(peerFeed, this.options)
+    await peer.ready()
 
     const keyString = key.toString('hex')
-    this.sources[keyString] = peerHyperbee
+    this.sources[keyString] = peer
 
     if (this.deletedSources[keyString])
       delete this.deletedSources[keyString]
 
     await this._update(keyString)
-    return peerHyperbee
+    return peer
   }
 
   removePeer (key) {
@@ -300,11 +300,11 @@ class MultiHyperbee extends Hyperbee {
   async _update(keyString, seqs) {
     if (this.deletedSources[keyString])
       return
-    const peerHyperbee = this.sources[keyString]
-    const peerFeed = peerHyperbee.feed
+    const peer = this.sources[keyString]
+    const peerFeed = peer.feed
     peerFeed.update(() => {
 // console.log(`UPDATE: ${peerFeed.key.toString('hex')}`)
-      let rs = peerHyperbee.createHistoryStream({ gte: -1 })
+      let rs = peer.createHistoryStream({ gte: -1 })
       let newSeqs = []
       let values = []
       rs.on('data', async (data) => {
