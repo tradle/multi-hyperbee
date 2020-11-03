@@ -3,21 +3,16 @@ const { promisify } = require('util')
 const ram = require('random-access-memory')
 
 const helpers = {
-  async createOne(key, options, name) {
-    let feeds = await helpers.create({count: 1, key, options, name})
-    return feeds[0]
-  },
 
-  async create({count, key, options, name, persistent}) {
+  async create({count, key, options, storage, persistent}) {
     if (!options)
       options = {}
-    if (!count)
+    if (!count || key)
       count = 1
     let feeds = []
     let opts = {...options, valueEncoding: 'utf-8' }
     for (let i=0; i<count; i++) {
-      // let feed = hypercore((name || './bee') + i, key, opts)
-      let feed = hypercore(persistent && name ? `./${name}${i}`: ram, key, opts)
+      let feed = hypercore(persistent && storage && `${storage}_${i}` || ram, key, opts)
       await helpers.promisifyAndExec(feed, 'ready')
       feeds.push(feed)
     }
