@@ -82,8 +82,22 @@ Options included:
   valueEncoding: <same as above>
 }
 ```
-**customMergeHandler** - CRDT handler to apply changes to the Object.
-
+**customMergeHandler** - CRDT handler to apply changes to the Object. 
+If not using default, it should be implemented in a following way
+```
+class MergeHandler {
+  constructor(store) {
+    this.store = store
+  }
+  // It'll apply diff to the correct version of an object 
+  merge(diff) {  
+  }
+  // That will generate diff based on the last version of the object in the store. 
+  genDiff(oldValue, newValue) {
+    return diff
+  }
+}
+```
 ### await db.put(key, storeValue)
 
 Put will write two objects at the same time to Store and to Diff hyperbee.
