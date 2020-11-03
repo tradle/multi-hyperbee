@@ -5,6 +5,7 @@ const size = require('lodash/size')
 
 // MergeHandler must use store._put to notify MultiHyperbee that it does not need to
 // generate diff object in this case
+/*
 const diffSchema = {
   obj: {
     _objectId: 'string',
@@ -38,13 +39,26 @@ const diffSchema = {
       }
     }
   },
-  timestamp: 'string'
+  _timestamp: 'string'
 }
-
+*/
 class MergeHandler {
   constructor(store) {
     this.store = store
   }
+  /*
+  Algorithm
+    - finds the last version of the object in the store.
+    - takes the earliest timestamp of the 'diff' and 'object'.
+    - finds all the diff objects on all the peers from this timestamp
+      - if the version of the diff has later timestamp than the version of the object
+         - applies all of the found diffs to this version
+      - if the timestamp of the diff is earlier than the timestamp of the last object version in the store
+         - finds the version of the object with the same timestamp as diff
+         - applies diff(s) from this timestamp to this object version and to all others object versions
+           that have a bigger than found initial object version timestamp accordingly.
+    - creates new object(s) version(s) with all applied differences
+  */
   async merge (diff) {
     let { obj, list, _timestamp } = diff
 
@@ -84,7 +98,7 @@ class MergeHandler {
 
     let entries
     try {
-      entries = await collect(unionStream)
+      entries = await this.collect(unionStream)
     } catch (err) {
       console.log(`Error updating with ${JSON.stringify(diff, null, 2)}`, err)
       return
@@ -94,7 +108,7 @@ class MergeHandler {
       let objTimestamp = entries[0].value()._timestamp
 
       let hist = this.store.createHistoryStream({gte: rkey, lte: rkey})
-      let objects = await collect(hist)
+      let objects = await this.collect(hist)
       let vobj = objects.find(obj => obj.value._timestamp === objTimestamp)
       prevResource = vobj.value
     }
@@ -115,6 +129,9 @@ class MergeHandler {
     }
   }
 
+  /*
+  Generates diff object according to diffSchema
+   */
   genDiff(newValue, oldValue) {
     if (!oldValue)
       oldValue = {}
@@ -137,53 +154,11 @@ class MergeHandler {
       if (oldVal === newVal  || (typeof oldVal === 'object' && isEqual(oldVal, newVal)))
         continue
       if (Array.isArray(oldVal)) {
-        let newVal1 = newVal.slice()
-        for (let i=0; i<oldVal.length; i++) {
-          let idx = newVal1.indexOf(oldVal[i])
-          if (idx !== -1) {
-            newVal1.splice(idx, 1)
-            continue
-          }
-          if (!insert.remove)
-            insert.remove = {}
-          if (!insert.remove[p])
-            insert.remove[p] = [{value: oldVal[i]}]
-        }
-        if (newVal1.length) {
-          if (!insert.add)
-            insert.add = {}
-          insert.add = []
-          newVal1.forEach(value => {
-            let idx = newVal.indexOf(value)
-            insert.add.push({after: newVal[idx - 1], value})
-          })
-        }
+        this._insertArray(insert, p, newVal, oldVal)
         continue
       }
       if (typeof oldVal === 'object') {
-        let result = this._diff(oldVal, newVal)
-        for (let pp in result) {
-          if (typeof result[pp] === 'undefined') {
-            if (!insert.remove)
-              insert.remove = {}
-            if (!insert.remove[p])
-              insert.remove[p] = {}
-
-            extend(insert.remove[p], {
-              [pp]: oldVal[pp]
-            })
-          }
-          else {
-            if (!insert.add) {
-              insert.add = {}
-              insert.add[p] = {}
-            }
-            insert.add[p] = {
-              ... insert.add[p],
-              [pp]: newVal[pp]
-            }
-          }
-        }
+        this._insertObject(insert, p, newVal, oldVal)
         continue
       }
     }
@@ -210,26 +185,73 @@ class MergeHandler {
       diff.obj._prevTimestamp = newValue._prevTimestamp
     return diff
   }
+  _insertObject(insert, p, newVal, oldVal) {
+    let result = this._diff(oldVal, newVal)
+    for (let pp in result) {
+      if (typeof result[pp] === 'undefined') {
+        if (!insert.remove)
+          insert.remove = {}
+        if (!insert.remove[p])
+          insert.remove[p] = {}
+
+        extend(insert.remove[p], {
+          [pp]: oldVal[pp]
+        })
+      }
+      else {
+        if (!insert.add) {
+          insert.add = {}
+          insert.add[p] = {}
+        }
+        insert.add[p] = {
+          ... insert.add[p],
+          [pp]: newVal[pp]
+        }
+      }
+    }
+  }
+  _insertArray(insert, prop, newVal, oldVal) {
+    let newVal1 = newVal.slice()
+    for (let i=0; i<oldVal.length; i++) {
+      let idx = newVal1.indexOf(oldVal[i])
+      if (idx !== -1) {
+        newVal1.splice(idx, 1)
+        continue
+      }
+      if (!insert.remove)
+        insert.remove = {}
+      if (!insert.remove[prop])
+        insert.remove[prop] = [{value: oldVal[i]}]
+    }
+    if (newVal1.length) {
+      if (!insert.add)
+        insert.add = {}
+      insert.add = []
+      newVal1.forEach(value => {
+        let idx = newVal.indexOf(value)
+        insert.add.push({after: newVal[idx - 1], value})
+      })
+    }
+  }
 
   _diff(obj1, obj2) {
     const result = {};
-    if (Object.is(obj1, obj2)) {
-        return undefined;
-    }
-    if (!obj2 || typeof obj2 !== 'object') {
-        return obj2;
-    }
+    if (Object.is(obj1, obj2))
+      return result
+
+    if (!obj2 || typeof obj2 !== 'object')
+      return obj2
+
     Object.keys(obj1 || {}).concat(Object.keys(obj2 || {})).forEach(key => {
-        if(obj2[key] !== obj1[key] && !Object.is(obj1[key], obj2[key])) {
-            result[key] = obj2[key];
-        }
-        if(typeof obj2[key] === 'object' && typeof obj1[key] === 'object') {
-            const value = diff(obj1[key], obj2[key]);
-            if (value !== undefined) {
-                result[key] = value;
-            }
-        }
-    });
+      if(obj2[key] !== obj1[key] && !Object.is(obj1[key], obj2[key]))
+        result[key] = obj2[key]
+
+      if(typeof obj2[key] === 'object' && typeof obj1[key] === 'object') {
+        const value = this._diff(obj1[key], obj2[key]);
+        if (value !== undefined)
+          result[key] = value;
+      }
+    })
     return result;
   }
 
@@ -335,7 +357,7 @@ class MergeHandler {
       else if (!size(obj[p]))
         delete from[p]
       else
-        deleteFrom(from[p], obj[p])
+        this.deleteFrom(from[p], obj[p])
     }
   }
 }
