@@ -112,6 +112,17 @@ the rest of API is the same as [Hyperbee](https://github.com/mafintosh/hyperbee)
 - Tighten the non-atomic failure modes when process dies after writing to `diff` and before writing to `store`, or after reading from `feed` and applying to `store'.
 - Support multiple bees, tries. We invision that peers will use one replication log to establish multi-writer for any number of shared data structures, that is for data structures local and remote peers can write into simultaneously. Using one replication log can help support atomic changes across multiple data structures.
 
+### Extend support to Hyperdrive
+In this version we only add multi-writer to Hyperbee. But we can extend it to Trie and Drive. Here are our thoughts on how this might work.
+
+Previous version of the design did not have a `diff` feed and thus followed multi-hyperdrive's design more closely. Multi-hyperdrive does not apply updates to the primary, which we did even in the initial version of multi-hyperbee. Instead on each read it checks on the fly which file is fresher and returns that file (It checks in primary and in all the replicas from peers). It also supports on-the-fly merging of the directory listings, without changing any structures on disk. In this design we deviated even further as we needed to support CRDT merging.
+
+To implement CRDT for Hyperdrive files, we might need to change multi-hyperdrive's design to use the `diff` feed:
+
+- CRDT diff must apply to the local (primary) hyperdrive. Multi-hyperdrive does not do that, keeping all changed files in the replica.
+- file diff in CRDT format is 3x the size of the changed data, so might warrant a second `diff` feed, to avoid slowing down DB replication. Hyperdrive uses 2 structures, hypertrie for directory and file metadata and hypercore for data. So changes in hypertrie can be propagated via `diff` and. 
+
+
 ## Algorithm
 *This is a third interation of the design, previous is described and implemented in the release tagged v0.1.*
 
@@ -130,16 +141,6 @@ For the CRDT algorithm to do its magic, we first rewind to the proper object ver
 - new version of the object is put() into store
 
 This algorithm ensures that all peers have the store in exactly the same state. 
-
-## Extend support to Hyperdrive
-In this version we only add multi-writer to Hyperbee. But we can extend it to Trie and Drive. Here are our thoughts on how this might work.
-
-Previous version of the design did not have a `diff` feed and thus followed multi-hyperdrive's design more closely. Multi-hyperdrive does not apply updates to the primary, which we did even in the initial version of multi-hyperbee. Instead on each read it checks on the fly which file is fresher and returns that file (It checks in primary and in all the replicas from peers). It also supports on-the-fly merging of the directory listings, without changing any structures on disk. In this design we deviated even further as we needed to support CRDT merging.
-
-To implement CRDT for Hyperdrive files, we might need to change multi-hyperdrive's design to use the `diff` feed:
-
-- CRDT diff must apply to the local (primary) hyperdrive. Multi-hyperdrive does not do that, keeping all changed files in the replica.
-- file diff in CRDT format is 3x the size of the changed data, so might warrant a second `diff` feed, to avoid slowing down DB replication. Hyperdrive uses 2 structures, hypertrie for directory and file metadata and hypercore for data. So changes in hypertrie can be propagated via `diff` and. 
 
 ## Cost and future optimizations
 **Read performance**: equals normal hyperbee performance
