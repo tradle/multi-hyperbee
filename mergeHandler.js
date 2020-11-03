@@ -115,7 +115,7 @@ class MergeHandler {
     }
   }
 
-  genDiff(key, newValue, oldValue) {
+  genDiff(newValue, oldValue) {
     if (!oldValue)
       oldValue = {}
     let add = {}
@@ -202,7 +202,7 @@ class MergeHandler {
     let diff = {
       _timestamp: newValue._timestamp,
       obj: {
-        _objectId: key
+        _objectId: newValue._objectId
       },
       list
     }
