@@ -5,9 +5,8 @@ const isEqual = require('lodash/isEqual')
 const cloneDeep = require('lodash/cloneDeep')
 
 const MultiHyperbee = require('../')
-const { promisifyAndExec, create, delay } = require('./helpers')
 var { object0, object1, object1_1, object2,
-        diff0, diff1, diff1_1, diff2 } = require('./constants')
+      diff0, diff1, diff1_1, diff2 } = require('./constants')
 
 const OPTIONS = {
         keyEncoding: 'utf-8',
@@ -118,7 +117,6 @@ async function setupReplChannel(count) {
     multiHBs.push(new MultiHyperbee(ram, {...OPTIONS, name: names[i]}))
   }
 
-  let cloneHBs = []
   for (let i=0; i<multiHBs.length; i++) {
     let cur = i
     let j = 0
@@ -127,6 +125,7 @@ async function setupReplChannel(count) {
     for (; j<multiHBs.length; j++) {
       if (j === cur) continue
       let cloneFeed = (await multiHBs[j].addPeer(diffFeed.key)).feed
+
       let pstream = diffFeed.replicate(false, {live: true})
       pstream.pipe(cloneFeed.replicate(true, {live: true})).pipe(pstream)
     }
@@ -142,4 +141,11 @@ async function put(hyperbee, diff, value) {
     val._diff = cloneDeep(diff)
 
   await hyperbee.put(key, val)
+}
+async function delay (ms) {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve()
+    }, ms)
+  })
 }

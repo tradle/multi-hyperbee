@@ -88,7 +88,7 @@ class MultiHyperbee extends Hyperbee {
     }
     if (noDiff) return
 
-    diff = this.mergeHandler.genDiff(key, value, cur  &&  cur.value)
+    diff = this.mergeHandler.genDiff(value, cur  &&  cur.value)
     if (prevTimestamp)
       diff.obj._prevTimestamp = prevTimestamp
     await this.diffHyperbee.put(`${key}/${timestamp}`, diff)
@@ -122,6 +122,7 @@ class MultiHyperbee extends Hyperbee {
       delete this.deletedSources[keyString]
 
     await this._update(keyString)
+
     return peer
   }
 
