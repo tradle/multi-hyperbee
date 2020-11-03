@@ -30,11 +30,6 @@ For the CRDT algorithm to do its magic, we first rewind to the proper object ver
 
 This algorithm ensures that all peers have the store in exactly the same state. 
 
-## Roadmap 
-- Support multiple bees, tries. We invision that peers will use one replication log to establish multi-writer for any number of shared data structures, that is for data structures local and remote peers can write into simultaneously. Using one replication log can help support atomic changes across multiple data structures.
-
-- Tighten the non-atomic failure modes when process dies after writing to `diff` and before writing to `store`, or after reading from `feed` and applying to `store'.
-
 ### Extend support to Hyperdrive
 In this version we only add multi-writer to Hyperbee. But we can extend it to Trie and Drive. Here are our thoughts on how this might work.
 
@@ -152,11 +147,10 @@ It is used by mergeHandler for applying changes to the Store object when for exa
 
 the rest of API is the same as [Hyperbee](https://github.com/mafintosh/hyperbee)
 
-### Limitations
+### Roadmap
 
-**batch** is not yet supported
-
-### Punch list
-
-MH - generate diff for insert/remove to array changes
+- MH - generate diff for insert/remove to array changes
+- **batch** is not yet supported
+- Tighten the non-atomic failure modes when process dies after writing to `diff` and before writing to `store`, or after reading from `feed` and applying to `store'.
+- Support multiple bees, tries. We invision that peers will use one replication log to establish multi-writer for any number of shared data structures, that is for data structures local and remote peers can write into simultaneously. Using one replication log can help support atomic changes across multiple data structures.
 
