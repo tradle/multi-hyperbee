@@ -1,4 +1,5 @@
 const Hyperbee = require('hyperbee')
+const hypercore = require('hypercore')
 const isEqual = require('lodash/isEqual')
 const size = require('lodash/size')
 const extend = require('lodash/extend')
@@ -9,27 +10,53 @@ const mergeHandler = require('./mergeHandler')
 const { Timestamp, MutableTimestamp } = require('./timestamp')()
 
 // This implementation uses HLC Clock implemented by James Long in his crdt demo app
-
 class MultiHyperbee extends Hyperbee {
-  constructor (feed, { diffHyperbee, opts={}, customMergeHandler}) {
-    // if (!diffHyperbee)
-    //   throw new Error('diffHyperbee - is a required option')
+  constructor(storage, options, customMergeHandler) {
+    let { valueEncoding, name } = options
+    let feed = hypercore(storage)
+    super(feed, options) // this creates the store
 
-    super(feed, opts)
-    this.name = opts.name || ''
-
-    this.diffHyperbee = diffHyperbee
-
+    this.storage = storage
+    this.options = options
     this.mergeHandler =  customMergeHandler && customMergeHandler || mergeHandler
     this.sources = {}
     this.deletedSources = {}
-    // this.clock = new Clock(new Timestamp(0, 0, name));
-    this.clock = new Clock(new Timestamp(0, 0, feed.key.toString('hex')));
+    this.name = name || ''
+    this._init = this.init()
   }
-  getDiffHyperbee() {
-    return this.diffHyperbee
+
+  async init() {
+    try {
+      await promisify(this.feed.ready.bind(this.feed))()
+    } catch (err) {
+      throw new Error('something wrong with the feed', err)
+    }
+
+    let diffStorage
+    if (typeof this.storage === 'string')
+      diffStorage = `${this.storage}_diff` // place diffHyperbee in the same directory
+    else
+      diffStorage = this.storage // storage function chosen by user: could be ram, ras3, etc.
+
+    this.diffFeed = hypercore(diffStorage)
+    try {
+      await promisify(this.diffFeed.ready.bind(this.diffFeed))()
+    } catch (err) {
+      throw new Error('something wrong with diff feed', err)
+    }
+    this.diffHyperbee = new Hyperbee(this.diffFeed, this.options)
+    this.clock = new Clock(new Timestamp(0, 0, this.feed.key.toString('hex')));
+  }
+  async get(key) {
+    await this._init
+    return super.get(key)
+  }
+  async del(key) {
+    await this._init
+    await super.del(key)
   }
   async put(key, value, noDiff) {
+    await this._init
     if (!this.diffHyperbee) {
       super.put(key, value)
       return
@@ -67,9 +94,57 @@ class MultiHyperbee extends Hyperbee {
       diff.obj._prevTimestamp = prevTimestamp
     await this.diffHyperbee.put(`${key}/${timestamp}`, diff)
   }
-  createUnionStream(key) {
+  async peek() {
+    await this._init
+    return await super.peek([options])
+  }
+  async getDiff() {
+    await this._init
+    return this.diffHyperbee
+  }
+
+  async addPeer(key) {
+    await this._init
+    let peerStorage
+    if (typeof this.storage === 'string')
+      peerStorage = `${this.storage}_peer_${size(this.sources) + 1}`
+    else
+      peerStorage = this.storage
+    let { valueEncoding } = this.options
+    let peerFeed = hypercore(peerStorage, key)
+
+    let peerHyperbee = new Hyperbee(peerFeed, this.options)
+    await peerHyperbee.ready()
+
+    const keyString = key.toString('hex')
+    this.sources[keyString] = peerHyperbee
+
+    if (this.deletedSources[keyString])
+      delete this.deletedSources[keyString]
+
+    await this._update(keyString)
+    return peerHyperbee
+  }
+
+  removePeer (key) {
     if (!this.diffHyperbee)
       throw new Error('Works only with Diff hyperbee')
+
+    const keyString = key.toString('hex')
+    const hyperbee = this.sources[keyString]
+
+    if (!hyperbee) return false
+
+    delete this.sources[keyString]
+    this.deletedSources[keyString] = hyperbee
+
+    return hyperbee
+  }
+  async getPeers() {
+    return Object.values(this.sources)
+  }
+  createUnionStream(key) {
+    // await this._resolveWithReady
 
     if (!key)
       throw new Error('Key is expected')
@@ -88,33 +163,6 @@ class MultiHyperbee extends Hyperbee {
         return a._timestamp > b._timestamp
       })
     return union
-  }
-  addHyperbee(hyperbee) {
-    if (!this.diffHyperbee)
-      throw new Error('Works only with Diff hyperbee')
-
-    const keyString = hyperbee.feed.key.toString('hex')
-    this.sources[keyString] = hyperbee
-// console.log(`Add hyperbee to ${this.name}: ${keyString}`)
-    if (this.deletedSources[keyString])
-      delete this.deletedSources[keyString]
-
-    this._update(keyString)
-  }
-
-  removeHyperbee (key) {
-    if (!this.diffHyperbee)
-      throw new Error('Works only with Diff hyperbee')
-
-    const keyString = key.toString('hex')
-    const hyperbee = this.sources[keyString]
-
-    if (!hyperbee) return false
-
-    delete this.sources[keyString]
-    this.deletedSources[keyString] = hyperbee
-
-    return hyperbee
   }
   batch() {
     if (!this.diffHyperbee)
@@ -137,17 +185,74 @@ class MultiHyperbee extends Hyperbee {
     if (!oldValue)
       oldValue = {}
     let add = {}
+    let insert = {}
+    let remove = {}
+
     for (let p in newValue) {
       if (p.charAt(0) === '_')
         continue
       let oldVal = oldValue[p]
       let newVal = newValue[p]
       delete oldValue[p]
-      if (oldVal  &&  (oldVal === newVal  || (typeof oldVal === 'object' && isEqual(oldVal, newVal))))
+
+      if (!oldVal) {
+        add[p] = newVal
         continue
-      add[p] = newVal
+      }
+
+      if (oldVal === newVal  || (typeof oldVal === 'object' && isEqual(oldVal, newVal)))
+        continue
+      if (Array.isArray(oldVal)) {
+        let newVal1 = newVal.slice()
+        for (let i=0; i<oldVal.length; i++) {
+          let idx = newVal1.indexOf(oldVal[i])
+          if (idx !== -1) {
+            newVal1.splice(idx, 1)
+            continue
+          }
+          if (!insert.remove)
+            insert.remove = {}
+          if (!insert.remove[p])
+            insert.remove[p] = [{value: oldVal[i]}]
+        }
+        if (newVal1.length) {
+          if (!insert.add)
+            insert.add = {}
+          insert.add = []
+          newVal1.forEach(value => {
+            let idx = newVal.indexOf(value)
+            insert.add.push({after: newVal[idx - 1], value})
+          })
+        }
+        continue
+      }
+      if (typeof oldVal === 'object') {
+        let result = this._diff(oldVal, newVal)
+        for (let pp in result) {
+          if (typeof result[pp] === 'undefined') {
+            if (!insert.remove)
+              insert.remove = {}
+            if (!insert.remove[p])
+              insert.remove[p] = {}
+
+            extend(insert.remove[p], {
+              [pp]: oldVal[pp]
+            })
+          }
+          else {
+            if (!insert.add) {
+              insert.add = {}
+              insert.add[p] = {}
+            }
+            insert.add[p] = {
+              ... insert.add[p],
+              [pp]: newVal[pp]
+            }
+          }
+        }
+        continue
+      }
     }
-    let remove = {}
     for (let p in oldValue) {
       if (p.charAt(0) === '_')
         continue
@@ -158,6 +263,8 @@ class MultiHyperbee extends Hyperbee {
       list.add = add
     if (size(remove))
       list.remove = remove
+    if (size(insert))
+      list.insert = insert
     let diff = {
       _timestamp: newValue._timestamp,
       obj: {
@@ -169,7 +276,28 @@ class MultiHyperbee extends Hyperbee {
       diff.obj._prevTimestamp = newValue._prevTimestamp
     return diff
   }
-  _update(keyString, seqs) {
+  _diff(obj1, obj2) {
+    const result = {};
+    if (Object.is(obj1, obj2)) {
+        return undefined;
+    }
+    if (!obj2 || typeof obj2 !== 'object') {
+        return obj2;
+    }
+    Object.keys(obj1 || {}).concat(Object.keys(obj2 || {})).forEach(key => {
+        if(obj2[key] !== obj1[key] && !Object.is(obj1[key], obj2[key])) {
+            result[key] = obj2[key];
+        }
+        if(typeof obj2[key] === 'object' && typeof obj1[key] === 'object') {
+            const value = diff(obj1[key], obj2[key]);
+            if (value !== undefined) {
+                result[key] = value;
+            }
+        }
+    });
+    return result;
+  }
+  async _update(keyString, seqs) {
     if (this.deletedSources[keyString])
       return
     const peerHyperbee = this.sources[keyString]
@@ -202,3 +330,18 @@ class MultiHyperbee extends Hyperbee {
 }
 module.exports = MultiHyperbee
 
+  // async init() {
+  //   await super.ready()
+  //   this.clock = new Clock(new Timestamp(0, 0, this.feed.key.toString('hex')));
+
+  //   let diffStorage
+  //   if (typeof this.storage === 'string')
+  //     diffStorage = `${this.storage}_diff` // place diffHyperbee in the same directory
+  //   else
+  //     diffStorage = this.storage // storage function chosen by user: could be ram, ras3, etc.
+
+  //   this.diffFeed = hypercore(diffStorage)
+
+  //   this.diffHyperbee = new Hyperbee(this.diffFeed, this.options)
+  //   await this.diffHyperbee.ready()
+  // }
