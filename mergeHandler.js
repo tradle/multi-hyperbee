@@ -5,7 +5,41 @@ const size = require('lodash/size')
 
 // MergeHandler must use store._put to notify MultiHyperbee that it does not need to
 // generate diff object in this case
-
+const diffSchema = {
+  obj: {
+    _objectId: 'string',
+    _prevTimestamp: 'string'
+  },
+  list: {
+    add: {
+      // value of the property can be primitive JSON types or JSON object or any arrays
+      property: 'any type',
+    },
+    remove: {
+      // value of the property can be any string but it's value is not used in any way
+      property: ''
+    },
+    insert: {
+      // could be insert in some value like object or array,
+      // otherwise will work the same way as add on top level
+      add: {
+        property: 'object',
+        // ARRAY
+        property: [
+          {
+            before: 'some value in array',
+            after: 'some value in array',
+            index: 'number'
+          }
+        ]
+      },
+      remove: {
+        property: 'JSON object or Array'
+      }
+    }
+  },
+  timestamp: 'string'
+}
 
 class MergeHandler {
   constructor(store) {
@@ -249,13 +283,14 @@ class MergeHandler {
       for (let action in insert) {
         let actionProps = insert[action]
         for (let prop in actionProps)
-          this.handleInsert({ to: doc[prop], value: actionProps[prop], isAdd: action === 'add' })
+          this.handleInsert({ prop, doc, value: actionProps[prop], isAdd: action === 'add' })
       }
     })
 
     return JSON.parse(JSON.stringify(updatedDoc))
   }
-  handleInsert({ to, value, isAdd }) {
+  handleInsert({ prop, doc, value, isAdd }) {
+    let to = doc[prop]
     if (!Array.isArray(value)) {
       if (typeof value === 'object') {
         if (isAdd)
@@ -265,8 +300,8 @@ class MergeHandler {
       }
       else if (isAdd)
         to = value
-      // else
-      //   delete to
+      else
+        delete to[prop]
       return
     }
     // debugger
@@ -305,3 +340,4 @@ class MergeHandler {
   }
 }
 module.exports = MergeHandler
+
