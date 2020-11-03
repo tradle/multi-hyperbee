@@ -79,15 +79,15 @@ Diff object that is written to diffHyperbee will have a key that is consists of 
 - storeValue key
 - storeValue timestamp
 
-## const replicaPeer = await db.addPeer(replicaKey)
+### const replicaPeer = await db.addPeer(replicaKey)
 
 Created replica Hyperbee using replica key 
 
-## const replicaPeer = db.removePeer(replicaKey)
+### const replicaPeer = db.removePeer(replicaKey)
 
 removes replica Hyperbee
 
-## const stream = db.createUnionStream(key)
+### const stream = db.createUnionStream(key)
 
 Use it for writing your own custom merge handler.
 It creates a union stream from all the replica hyperbees where all the entries are the Diff objects. 
@@ -105,14 +105,14 @@ It is used by mergeHandler for applying changes to the Store object when for exa
 
 the rest of API is the same as [Hyperbee](https://github.com/mafintosh/hyperbee)
 
-### Roadmap
+## Roadmap
 
 - MH - generate diff for insert/remove to array changes
 - **batch** is not yet supported
 - Tighten the non-atomic failure modes when process dies after writing to `diff` and before writing to `store`, or after reading from `feed` and applying to `store'.
 - Support multiple bees, tries. We invision that peers will use one replication log to establish multi-writer for any number of shared data structures, that is for data structures local and remote peers can write into simultaneously. Using one replication log can help support atomic changes across multiple data structures.
 
-### Algorithm
+## Algorithm
 *This is a third interation of the design, previous is described and implemented in the release tagged v0.1.*
 
 In the prior design we had a primary hyperbee and sparse replicas of other peers' primary hyperbees. 
@@ -131,7 +131,7 @@ For the CRDT algorithm to do its magic, we first rewind to the proper object ver
 
 This algorithm ensures that all peers have the store in exactly the same state. 
 
-### Extend support to Hyperdrive
+## Extend support to Hyperdrive
 In this version we only add multi-writer to Hyperbee. But we can extend it to Trie and Drive. Here are our thoughts on how this might work.
 
 Previous version of the design did not have a `diff` feed and thus followed multi-hyperdrive's design more closely. Multi-hyperdrive does not apply updates to the primary, which we did even in the initial version of multi-hyperbee. Instead on each read it checks on the fly which file is fresher and returns that file (It checks in primary and in all the replicas from peers). It also supports on-the-fly merging of the directory listings, without changing any structures on disk. In this design we deviated even further as we needed to support CRDT merging.
