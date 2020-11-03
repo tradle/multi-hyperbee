@@ -6,7 +6,7 @@ const extend = require('lodash/extend')
 const Union = require('sorted-union-stream')
 const { promisify } = require('util')
 const Clock = require('./clock')
-const mergeHandler = require('./mergeHandler')
+const MergeHandler = require('./mergeHandler')
 const { Timestamp, MutableTimestamp } = require('./timestamp')()
 
 // This implementation uses HLC Clock implemented by James Long in his crdt demo app
@@ -18,7 +18,7 @@ class MultiHyperbee extends Hyperbee {
 
     this.storage = storage
     this.options = options
-    this.mergeHandler =  customMergeHandler && customMergeHandler || mergeHandler
+    this.mergeHandler =  customMergeHandler && customMergeHandler || new MergeHandler(this)
     this.sources = {}
     this.deletedSources = {}
     this.name = name || ''
@@ -88,8 +88,7 @@ class MultiHyperbee extends Hyperbee {
     }
     if (noDiff) return
 
-    debugger
-    diff = this._genDiff(key, value, cur  &&  cur.value)
+    diff = this.mergeHandler.genDiff(key, value, cur  &&  cur.value)
     if (prevTimestamp)
       diff.obj._prevTimestamp = prevTimestamp
     await this.diffHyperbee.put(`${key}/${timestamp}`, diff)
@@ -181,122 +180,6 @@ class MultiHyperbee extends Hyperbee {
   async _put(key, value) {
     await this.put(key, value, true)
   }
-  _genDiff(key, newValue, oldValue) {
-    if (!oldValue)
-      oldValue = {}
-    let add = {}
-    let insert = {}
-    let remove = {}
-
-    for (let p in newValue) {
-      if (p.charAt(0) === '_')
-        continue
-      let oldVal = oldValue[p]
-      let newVal = newValue[p]
-      delete oldValue[p]
-
-      if (!oldVal) {
-        add[p] = newVal
-        continue
-      }
-
-      if (oldVal === newVal  || (typeof oldVal === 'object' && isEqual(oldVal, newVal)))
-        continue
-      if (Array.isArray(oldVal)) {
-        let newVal1 = newVal.slice()
-        for (let i=0; i<oldVal.length; i++) {
-          let idx = newVal1.indexOf(oldVal[i])
-          if (idx !== -1) {
-            newVal1.splice(idx, 1)
-            continue
-          }
-          if (!insert.remove)
-            insert.remove = {}
-          if (!insert.remove[p])
-            insert.remove[p] = [{value: oldVal[i]}]
-        }
-        if (newVal1.length) {
-          if (!insert.add)
-            insert.add = {}
-          insert.add = []
-          newVal1.forEach(value => {
-            let idx = newVal.indexOf(value)
-            insert.add.push({after: newVal[idx - 1], value})
-          })
-        }
-        continue
-      }
-      if (typeof oldVal === 'object') {
-        let result = this._diff(oldVal, newVal)
-        for (let pp in result) {
-          if (typeof result[pp] === 'undefined') {
-            if (!insert.remove)
-              insert.remove = {}
-            if (!insert.remove[p])
-              insert.remove[p] = {}
-
-            extend(insert.remove[p], {
-              [pp]: oldVal[pp]
-            })
-          }
-          else {
-            if (!insert.add) {
-              insert.add = {}
-              insert.add[p] = {}
-            }
-            insert.add[p] = {
-              ... insert.add[p],
-              [pp]: newVal[pp]
-            }
-          }
-        }
-        continue
-      }
-    }
-    for (let p in oldValue) {
-      if (p.charAt(0) === '_')
-        continue
-      remove[p] = ''
-    }
-    let list = {}
-    if (size(add))
-      list.add = add
-    if (size(remove))
-      list.remove = remove
-    if (size(insert))
-      list.insert = insert
-    let diff = {
-      _timestamp: newValue._timestamp,
-      obj: {
-        _objectId: key
-      },
-      list
-    }
-    if (newValue._prevTimestamp)
-      diff.obj._prevTimestamp = newValue._prevTimestamp
-    return diff
-  }
-  _diff(obj1, obj2) {
-    const result = {};
-    if (Object.is(obj1, obj2)) {
-        return undefined;
-    }
-    if (!obj2 || typeof obj2 !== 'object') {
-        return obj2;
-    }
-    Object.keys(obj1 || {}).concat(Object.keys(obj2 || {})).forEach(key => {
-        if(obj2[key] !== obj1[key] && !Object.is(obj1[key], obj2[key])) {
-            result[key] = obj2[key];
-        }
-        if(typeof obj2[key] === 'object' && typeof obj1[key] === 'object') {
-            const value = diff(obj1[key], obj2[key]);
-            if (value !== undefined) {
-                result[key] = value;
-            }
-        }
-    });
-    return result;
-  }
   async _update(keyString, seqs) {
     if (this.deletedSources[keyString])
       return
@@ -322,7 +205,7 @@ class MultiHyperbee extends Hyperbee {
       })
       rs.on('end', async (data) => {
         for (let i=0; i<values.length; i++)
-          await this.mergeHandler(this, values[i])
+          await this.mergeHandler.merge(values[i])
       })
       this._update(keyString, newSeqs)
     })
