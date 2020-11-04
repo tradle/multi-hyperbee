@@ -23,48 +23,27 @@ test('Hyperbee - metadata bug', async t => {
   await ch1.ready()
   await ch2.ready()
 
-  update(ch2, h1)
-  update(ch1, h2)
+  update(ch2, '2')
+  update(ch1, '1')
 
-  let pstream = f1.replicate(false, {live: true})
-  pstream.pipe(cf1.replicate(true, {live: true})).pipe(pstream)
+  let stream1 = f1.replicate(false, {live: true})
+  stream1.pipe(cf1.replicate(true, {live: true})).pipe(stream1)
 
-  pstream = f2.replicate(false, {live: true})
-  pstream.pipe(cf2.replicate(true, {live: true})).pipe(pstream)
+  // Some strange thing. If I comment out the next 2 lines, there is no error
+  let stream2 = f2.replicate(false, {live: true})
+  stream2.pipe(cf2.replicate(true, {live: true})).pipe(stream2)
 
   await h1.put('key1', 'value1')
-delay(100)
-  await h2.put('key2', 'value2')
-delay(100)
-  let hb = [h1, h2, ch1, ch2]
-  for (let i=0; i<hb.length; i++) {
-    let hs = hb[i].createHistoryStream()
-    await new Promise((resolve, reject) => {
-      hs.on('data', ({value}) => {
-        console.log(value)
-      })
-      hs.on('end', (data) => {
-        resolve()
-      })
-    })
-  }
+
   t.end()
 })
-
-
-function update(peer, main) {
+function update(peer) {
   peer.feed.update(() => {
-    debugger
     let rs = peer.createHistoryStream({ gte: -1 })
     rs.on('data', async (data) => {
-      let { seq, key, value } = data
-      debugger
-      await main.put(key, value)
+      console.log(data)
     })
-    rs.on('end', async (data) => {
-      debugger
-    })
-    update(peer, main)
+    update(peer)
   })
 }
 
