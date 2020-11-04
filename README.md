@@ -5,7 +5,7 @@ This repository owes origins of its design to [@RangerMauve](https://github.com/
 A LevelUP compatible leaderless multi-master database with eventual consistency, using hyperbee + CRDT + HLC.  Similarly CockroachDB achieves replication on top of RocksDB, but here it is a pure P2P [streaming](https://github.com/tradle/why-hypercore/blob/master/FAQ.md#what-is-the-usp-unique-selling-proposition-of-hypercore) database, with zero central management. LevelDB compatibility allows to use Dynalite on top to achieve [DynamoDB compatibility](https://aws.amazon.com/dynamodb/) with multiple tables, auto-updated secondary indexes, and fairly complex queries combining those indexes. Work on @mhart's [Dynalite](https://github.com/tradle/dynalite) is almost completed to remove the HTTP server, to make this combination perfect as an embedded database and for serverless scenarios.
 
 ## The need
-[Hyperbee](https://github.com/mafintosh/hyperbee) is one-of-a-kind steaming database that can change the way we work with the databases. But like all other low-level components of hypercore ecosystem it is a single-writer data structure. Multi-writer is a higher-level abstraction, hence the name multi-hyperbee.
+[Hyperbee](https://github.com/mafintosh/hyperbee) is one-of-a-kind steaming database that can change the way we work with databases. But like all other low-level components of hypercore ecosystem it is a single-writer data structure. Multi-writer is a higher-level abstraction, hence the name multi-hyperbee.
 
 ## Use cases
 - Multi-device support. One or more devices are personal cloud peers.
