@@ -29,11 +29,10 @@ test('Hyperbee - metadata bug', async t => {
   let stream1 = f1.replicate(false, {live: true})
   stream1.pipe(cf1.replicate(true, {live: true})).pipe(stream1)
 
-  // Some strange thing. If I comment out the next 2 lines, there is no error
+  // Some strange thing.
+  // If I comment out the next 2 lines, there is no error
   let stream2 = f2.replicate(false, {live: true})
   stream2.pipe(cf2.replicate(true, {live: true})).pipe(stream2)
-
-  await h1.put('key1', 'value1')
 
   t.end()
 })
@@ -45,9 +44,5 @@ function update(peer) {
     })
     update(peer)
   })
-}
-
-async function delay (ms) {
-  return new Promise(resolve => setTimeout(() => resolve, ms))
 }
 
