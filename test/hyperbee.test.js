@@ -11,6 +11,9 @@ const OPTIONS = {
 test('Hyperbee - metadata bug', async t => {
   let f1 = hypercore(ram)
   let f2 = hypercore(ram)
+
+  // If you replace OPTIONS with {...OPTIONS, metedata: {}}
+  // in all new Hyperbee() calls there will be no error
   let h1 = new Hyperbee(f1, OPTIONS)
   let h2 = new Hyperbee(f2, OPTIONS)
   await h1.ready()
@@ -34,8 +37,10 @@ test('Hyperbee - metadata bug', async t => {
   let stream2 = f2.replicate(false, {live: true})
   stream2.pipe(cf2.replicate(true, {live: true})).pipe(stream2)
 
+  h1.put('key', 'value')
   t.end()
 })
+
 function update(peer) {
   peer.feed.update(() => {
     let rs = peer.createHistoryStream({ gte: -1 })
