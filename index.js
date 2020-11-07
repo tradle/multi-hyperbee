@@ -1,21 +1,25 @@
 const Hyperbee = require('hyperbee')
 const hypercore = require('hypercore')
-const isEqual = require('lodash/isEqual')
-const size = require('lodash/size')
-const extend = require('lodash/extend')
+const { isEqual, size, extend } = require('lodash')
 const Union = require('sorted-union-stream')
-const { promisify } = require('util')
 const Clock = require('./clock')
 const MergeHandler = require('./mergeHandler')
 const { Timestamp, MutableTimestamp } = require('./timestamp')()
 
+const KEY_TO_PEERS = '__peers'
 // This implementation uses HLC Clock implemented by James Long in his crdt demo app
 class MultiHyperbee extends Hyperbee {
   constructor(storage, options, customMergeHandler) {
-    let { valueEncoding, name } = options
+    let { valueEncoding, name, metadata } = options
     let feed = hypercore(storage)
+    if (!metadata)
+      options.metadata = metadata = {}
+
+    extend(options.metadata, {contentFeed: KEY_TO_PEERS})
+
     super(feed, options) // this creates the store
 
+    this.peerListKey = metadata.contentFeed
     this.storage = storage
     this.options = options
     this.mergeHandler =  customMergeHandler && customMergeHandler || new MergeHandler(this)
@@ -26,30 +30,26 @@ class MultiHyperbee extends Hyperbee {
   }
 
   async init() {
-    try {
-      await promisify(this.feed.ready.bind(this.feed))()
-    } catch (err) {
-      throw new Error('something wrong with the feed', err)
-    }
+    await this.ready()
+    this.clock = new Clock(new Timestamp(0, 0, this.feed.key.toString('hex')));
 
     let diffStorage
-    if (typeof this.storage === 'string')
+    let presistentStorage = typeof this.storage === 'string'
+    if (presistentStorage)
       diffStorage = `${this.storage}_diff` // place diffHyperbee in the same directory
     else
       diffStorage = this.storage // storage function chosen by user: could be ram, ras3, etc.
 
     this.diffFeed = hypercore(diffStorage)
-    try {
-      await promisify(this.diffFeed.ready.bind(this.diffFeed))()
-    } catch (err) {
-      throw new Error('something wrong with diff feed', err)
-    }
     this.diffHyperbee = new Hyperbee(this.diffFeed, this.options)
-    this.clock = new Clock(new Timestamp(0, 0, this.feed.key.toString('hex')));
+    await this.diffHyperbee.ready()
+    if (presistentStorage)
+      await this.restorePeers()
   }
+
   async get(key) {
     await this._init
-    return super.get(key)
+    return this._get(key)
   }
   async del(key) {
     await this._init
@@ -57,7 +57,7 @@ class MultiHyperbee extends Hyperbee {
   }
   async put(key, value, noDiff) {
     await this._init
-    if (!this.diffHyperbee) {
+    if (key === this.peerListKey) {
       super.put(key, value)
       return
     }
@@ -102,33 +102,30 @@ class MultiHyperbee extends Hyperbee {
     return this.diffHyperbee
   }
 
-  async addPeer(key) {
+  async addPeer(key, allPeersKeyStrings) {
     await this._init
-    let peerStorage
-    if (typeof this.storage === 'string')
-      peerStorage = `${this.storage}_peer_${size(this.sources) + 1}`
-    else
-      peerStorage = this.storage
-    let { valueEncoding } = this.options
-    let peerFeed = hypercore(peerStorage, key)
-
-    let peer = new Hyperbee(peerFeed, this.options)
-    await peer.ready()
-
-    const keyString = key.toString('hex')
-    this.sources[keyString] = peer
-
-    if (this.deletedSources[keyString])
-      delete this.deletedSources[keyString]
-
-    await this._update(keyString)
-
-    return peer
+    return await this._addPeer(key)
   }
 
-  removePeer (key) {
-    if (!this.diffHyperbee)
-      throw new Error('Works only with Diff hyperbee')
+  async restorePeers() {
+    let peerList = await this._get(this.peerListKey)
+    if (!peerList || !peerList.value ||  !peerList.value.length)
+      return
+    let keys = peerList.value
+    let keyStrings = keys.map(key => key.toString('hex'))
+    let peersHB = []
+    for (let i=0; i<keys.length; i++) {
+      let key = keys[i]
+      let keyString = keyStrings[i]
+
+      let peer = await this._addPeer(key, keyStrings)
+      peersHB.push(peer)
+      this.sources[keyString] = peer
+    }
+    return peersHB
+  }
+  async removePeer (key) {
+    await this._init
 
     const keyString = key.toString('hex')
     const hyperbee = this.sources[keyString]
@@ -141,11 +138,10 @@ class MultiHyperbee extends Hyperbee {
     return hyperbee
   }
   async getPeers() {
+    await this._init
     return Object.values(this.sources)
   }
   createUnionStream(key) {
-    // await this._resolveWithReady
-
     if (!key)
       throw new Error('Key is expected')
     let sortedStreams = []
@@ -165,21 +161,76 @@ class MultiHyperbee extends Hyperbee {
     return union
   }
   batch() {
-    if (!this.diffHyperbee)
-      return super.batch()
-
     throw new Error('Not supported yet')
   }
 
+    // need this for restore peers on init stage
+  async _get(key) {
+    return super.get(key)
+  }
+  async _put(key, value) {
+    await this.put(key, value, true)
+  }
+  async _addPeer(key, allPeersKeyStrings) {
+    const keyString = key.toString('hex')
+    let peer = this.sources[keyString]
+    if (peer)
+      return peer
+    let peerStorage
+    if (typeof this.storage === 'string')
+      peerStorage = `${this.storage}_peer_${size(this.sources) + 1}`
+    else
+      peerStorage = this.storage
+    let { valueEncoding } = this.options
+    let peerFeed = hypercore(peerStorage, key)
+
+    peer = new Hyperbee(peerFeed, this.options)
+    await peer.ready()
+
+    this.sources[keyString] = peer
+
+    if (!allPeersKeyStrings || allPeersKeyStrings.indexOf(keyString) === -1)
+      await this._addRemovePeer(keyString, true)
+
+    if (this.deletedSources[keyString])
+      delete this.deletedSources[keyString]
+
+    await this._update(keyString)
+
+    return peer
+  }
+  async _addRemovePeer(keyString, isAdd) {
+    let peersList
+    try {
+      peersList = await this.get(this.peerListKey)
+    } catch (err) {
+      debugger
+    }
+
+    if (!peersList)
+      peersList = []
+    else
+      peersList = peersList.value
+    if (isAdd)
+      peersList.push(keyString)
+    else {
+      let idx = peersList.indexOf(keyString)
+      if (idx === -1) {
+        debugger
+        console.log('Something went wrong. The key was not found in peers list')
+        return
+      }
+      peersList.splice(idx, 1)
+    }
+
+    await this._put(this.peerListKey, peersList)
+  }
   _parseTimestamp(timestamp) {
     let tm = timestamp.split('-')
     return {
       millis: new Date(tm[0]).getTime(),
       counter: parseInt(tm[1])
     }
-  }
-  async _put(key, value) {
-    await this.put(key, value, true)
   }
   async _update(keyString, seqs) {
     if (this.deletedSources[keyString])
@@ -192,8 +243,10 @@ class MultiHyperbee extends Hyperbee {
       let newSeqs = []
       let values = []
       rs.on('data', async (data) => {
-        let { seq, value } = data
+        let { key, seq, value } = data
         newSeqs.push(seq)
+        if (!value  &&  key.trim().replace(/[^a-zA-Z0-9_]/g, '') === KEY_TO_PEERS)
+          return
 
         let {millis, counter, node} = this._parseTimestamp(value._timestamp)
 
@@ -213,19 +266,3 @@ class MultiHyperbee extends Hyperbee {
   }
 }
 module.exports = MultiHyperbee
-
-  // async init() {
-  //   await super.ready()
-  //   this.clock = new Clock(new Timestamp(0, 0, this.feed.key.toString('hex')));
-
-  //   let diffStorage
-  //   if (typeof this.storage === 'string')
-  //     diffStorage = `${this.storage}_diff` // place diffHyperbee in the same directory
-  //   else
-  //     diffStorage = this.storage // storage function chosen by user: could be ram, ras3, etc.
-
-  //   this.diffFeed = hypercore(diffStorage)
-
-  //   this.diffHyperbee = new Hyperbee(this.diffFeed, this.options)
-  //   await this.diffHyperbee.ready()
-  // }
