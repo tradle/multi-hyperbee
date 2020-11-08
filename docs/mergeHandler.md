@@ -1,9 +1,14 @@
 # Default Merge Handler
+
 ## API
-#### `const mergeHandle = new MergeHandler(multiHyperbee)`
+
+#### `const mergeHandle = new MergeHandler(store)`
 Creates and instance of the Merge Handler for a particular multiHyperbee
+`store` is a MultiHyperbee instance
+
 #### `merge(diff)`
 Finds the object corresponding to **__objectId** in **diff** object and performs the merge. Algorithm below
+
 #### `const diffObject = genDiff(oldValue, newValue)`
 Generates **diff** object when multi-hyperbee **put** is called and no **_diff** object was passed with the **store** object
 
