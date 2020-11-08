@@ -1,12 +1,29 @@
-# Default Merge Handler
+# Merge Handler
+
+All the calls to Merge Handler are done by MultiHyperbee. That means that if you want to use your own Merge Handler, it needs to be passed as a parameter to MultiHyperbee like this:
+
+```
+const multiHyperbee = new MultiHyperbee(storage, [options], customMergeHandler)
+```
+
+MergeHandler gets called by Myltihyperbee:
+
+1. the **diff** object hits one of the replica peer and the **store** object needs to be updated with the new changes. In this case the call would be:
+```
+await mergeHandler.merge(diff)
+```
+2. `multiHyperbee.put(key, object)` will call `mergeHandler.genDiff(oldValue, newValue)` if the **diff** object was not found in the **object**. In this case **diff** object will be generated based on differences between the **object** and it's last version in store.
+
+_Note_ **diff** object could be passed as **_diff** property of the **object**. It will be deleted from **object** before put of the **object** is executed.
+
 
 ## API
 
 #### `const mergeHandle = new MergeHandler(store)`
-Creates and instance of the Merge Handler for a particular multiHyperbee
+Creates an instance of the Merge Handler for a particular multiHyperbee.
 `store` is a MultiHyperbee instance
 
-#### `merge(diff)`
+#### `await mergeHandler.merge(diff)`
 Finds the object corresponding to **__objectId** in **diff** object and performs the merge. Algorithm below
 
 #### `const diffObject = genDiff(oldValue, newValue)`
