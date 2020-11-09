@@ -6,13 +6,16 @@ All the calls to Merge Handler are done by MultiHyperbee. That means that if you
 const multiHyperbee = new MultiHyperbee(storage, [options], customMergeHandler)
 ```
 
-MergeHandler gets called by Myltihyperbee:
+MyltiHyperbee calls MergeHandler in these cases:
 
 1. the **diff** object hits one of the replica peer and the **store** object needs to be updated with the new changes. In this case the call would be:
+
 ```
 await mergeHandler.merge(diff)
 ```
+
 2. `multiHyperbee.put(key, object)` will call `mergeHandler.genDiff(oldValue, newValue)` if the **diff** object was not found in the **object**. In this case **diff** object will be generated based on differences between the **object** and it's last version in store.
+The **diff** object will have a key `key/_timestamp`. This way it'll be easy to find the **store** and/or **diff** object that correspond to the same **_timestamp**
 
 _Note_ **diff** object could be passed as **_diff** property of the **object**. It will be deleted from **object** before put of the **object** is executed.
 
@@ -44,8 +47,11 @@ This creates a fork from the previous sequence of changes of the store objects
 
 ## Diff object schema
 
+_Note_ the `property` in schema below corresponds to the `property` that is changed in store **object**.
+
 ``` js
   const diffSchema = {
+    _timestamp: 'string', // _timestamp has the same value as the store object the diff corresponds to
     obj: {
       _objectId: 'string',
       _prevTimestamp: 'string'
@@ -77,8 +83,7 @@ This creates a fork from the previous sequence of changes of the store objects
           property: 'JSON object or Array'
         }
       }
-    },
-    _timestamp: 'string'
+    }
   }
 ```
 
