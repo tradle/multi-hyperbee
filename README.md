@@ -54,6 +54,7 @@ class MergeHandler {
   }
 }
 ```
+
 ### await db.put(key, storeValue)
 
 Put will write two objects at the same time to Store and to Diff hyperbee.
@@ -150,7 +151,14 @@ This algorithm ensures that all peers have the store in exactly the same state.
 - Reed matching version of the object in store
 - Merge in memory and Write new version to store
 
-## Failure modes discussion 
-
-- update() event on replica occured and computer died before we applied it to store. Will it arrive again?
+## Failure modes 
+### Done
 - HLC clock needs to be restored on restart
+  - the HLC clock is restored from the **timestamp** of the last record in Store hyperbee
+- Recovery after restart - persistent storage only
+  - Multihyperbee has a manifest that contains the list of peers keys. 
+  - The key to the manifest is saved in the header block of the MultiHyperbee Store. 
+  - Peer keys are used to restore the peers in case of the restart. 
+### Discussions
+- update() event on replica occured and computer died before we applied it to store. Will it arrive again?
+
