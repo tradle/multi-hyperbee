@@ -54,6 +54,8 @@ class MergeHandler {
   }
 }
 ```
+Multihyperbee has a manifest that contains the list of peers keys. The key to the manifest is saved in the header block of the MultiHyperbee Store. Peer keys are used to restore the peers in case of the restart. This is useful for the persistent storage only.
+
 ### await db.put(key, storeValue)
 
 Put will write two objects at the same time to Store and to Diff hyperbee.
