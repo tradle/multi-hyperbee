@@ -6,60 +6,10 @@ const size = require('lodash/size')
 // MergeHandler must use store._put to notify MultiHyperbee that it does not need to
 // generate diff object in this case
 
-/**
-  const diffSchema = {
-    obj: {
-      _objectId: 'string',
-      _prevTimestamp: 'string'
-    },
-    list: {
-      add: {
-        // value of the property can be primitive JSON types or JSON object or any arrays
-        property: 'any type',
-      },
-      remove: {
-        // value of the property can be any string but it's value is not used in any way
-        property: ''
-      },
-      insert: {
-        // could be insert in some value like object or array,
-        // otherwise will work the same way as add on top level
-        add: {
-          property: 'object',
-          // ARRAY
-          property: [
-            {
-              before: 'some value in array',
-              after: 'some value in array',
-              index: 'number'
-            }
-          ]
-        },
-        remove: {
-          property: 'JSON object or Array'
-        }
-      }
-    },
-    _timestamp: 'string'
-  }
-*/
 class MergeHandler {
   constructor(store) {
     this.store = store
   }
-  /**
-   * Algorithm
-   * - finds the last version of the object in the store.
-   * - takes the earliest timestamp of the 'diff' and 'object'.
-   * - finds all the diff objects on all the peers from this timestamp
-   *   - if the version of the diff has later timestamp than the version of the object
-   *      - applies all of the found diffs to this version
-   *   - if the timestamp of the diff is earlier than the timestamp of the last object version in the store
-   *      - finds the version of the object with the same timestamp as diff
-   *      - applies diff(s) from this timestamp to this object version and to all others object versions
-   *        that have a bigger than found initial object version timestamp accordingly.
-   * - creates new object(s) version(s) with all applied differences
-   */
   async merge (diff) {
     let { obj, list, _timestamp } = diff
 
