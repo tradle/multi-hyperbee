@@ -12,8 +12,9 @@ test('Multihyperbee - restore peers, restore HLC clock, cleanup peers', async t 
   if (hasPeers) {
     let storeArr = [object0, object1, object1_1]
     let diffArr = [diff0, diff1, diff1_1, diff2]
-    await checkStoreAndDiff(t, multiHBs, storeArr, diffArr, true)
-    rmdir(storage, function(error) {
+
+    await checkStoreAndDiff(t, multiHBs, storeArr, diffArr)
+    rmdir(storage, error => {
       if (error)
         console.log(`Error deleting directory ${storage}`, error)
       else
