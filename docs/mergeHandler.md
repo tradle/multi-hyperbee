@@ -1,9 +1,15 @@
 # Default Merge Handler
 
+All the calls to Merge Handler are done by MultiHyperbee. Which means that if you write your own Merge Handler, it is need to be passed as a parameter to MultiHyperbee like this:
+
+```
+const multihyperbee = new MultiHyperbee(s, [options], customMergeHandler)
+```
+
 ## API
 
 #### `const mergeHandle = new MergeHandler(store)`
-Creates and instance of the Merge Handler for a particular multiHyperbee
+Creates an instance of the Merge Handler for a particular multiHyperbee.
 `store` is a MultiHyperbee instance
 
 #### `merge(diff)`
@@ -29,6 +35,7 @@ This creates a fork from the previous sequence of changes of the store objects
 
 ``` js
   const diffSchema = {
+    _timestamp: 'string',
     obj: {
       _objectId: 'string',
       _prevTimestamp: 'string'
@@ -60,8 +67,7 @@ This creates a fork from the previous sequence of changes of the store objects
           property: 'JSON object or Array'
         }
       }
-    },
-    _timestamp: 'string'
+    }
   }
 ```
 
