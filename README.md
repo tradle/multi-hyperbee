@@ -54,7 +54,6 @@ class MergeHandler {
   }
 }
 ```
-Multihyperbee has a manifest that contains the list of peers keys. The key to the manifest is saved in the header block of the MultiHyperbee Store. Peer keys are used to restore the peers in case of the restart. This is useful for the persistent storage only.
 
 ### await db.put(key, storeValue)
 
@@ -156,3 +155,9 @@ This algorithm ensures that all peers have the store in exactly the same state.
 
 - update() event on replica occured and computer died before we applied it to store. Will it arrive again?
 - HLC clock needs to be restored on restart
+  - For now the HLC clock is restored from the **timestamp** of the last record in Store hyperbee
+- Recovery after restart - persistent storage only
+  - Multihyperbee has a manifest that contains the list of peers keys. 
+  - The key to the manifest is saved in the header block of the MultiHyperbee Store. 
+  - Peer keys are used to restore the peers in case of the restart. 
+
