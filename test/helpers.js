@@ -10,7 +10,7 @@ const OPTIONS = {
       }
 
 const helpers = {
-  async setupReplChannel(count, storage) {
+  async setup(count, storage) {
     let names = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
     let multiHBs = []
 
@@ -27,7 +27,6 @@ const helpers = {
     if (!storage)
       return
     let peersMap = []
-    debugger
     let hasPeers
     for (let i=0; i<multiHBs.length; i++) {
       let multiHB = multiHBs[i]
@@ -39,7 +38,6 @@ const helpers = {
     return hasPeers
   },
   async put(hyperbee, diff, value) {
-    // debugger
     let key = `${value._objectId}`
     let val = cloneDeep(value)
     if (diff)
@@ -55,18 +53,19 @@ const helpers = {
     })
   },
 
-  async checkStoreAndDiff(t, multiHBs, storeArr, diffArr) {
+  async checkStoreAndDiff(t, multiHBs, storeArr, diffArr, print) {
     for (let i=0; i<multiHBs.length; i++) {
       let multiHB = multiHBs[i]
       let sec = multiHB.createHistoryStream()
       let counter = storeArr.length
       await new Promise((resolve, reject) => {
         sec.on('data', data => {
-          // console.log(multiHB.name + ' ' + JSON.stringify(value, null, 2))
-          if (data.key === '__peers') {
-            // debugger
+          if (print)
+            console.log(multiHB.name + ' ' + JSON.stringify(data.value, null, 2))
+          // Check that it's not peer list
+          if (Array.isArray(data.value))
             return
-          }
+
           let { value } = data
           delete value._timestamp
           delete value._prevTimestamp
@@ -85,9 +84,11 @@ const helpers = {
     let diffs = await Promise.all(multiHBs.map(mh => mh.getDiff()))
     for (let i=0; i<diffs.length; i++) {
       let hstream = diffs[i].createHistoryStream()
+      let multiHB = multiHBs[i]
       await new Promise((resolve, reject) => {
         hstream.on('data', ({value}) => {
-          // console.log(secondary.name + 'Diff ' + JSON.stringify(data, null, 2))
+          if (print)
+            console.log(multiHB.name + 'Diff ' + JSON.stringify(value, null, 2))
           delete value._timestamp
           delete value.obj._prevTimestamp
           t.same(value, diffArr[0])
