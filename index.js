@@ -12,10 +12,14 @@ class MultiHyperbee extends Hyperbee {
   constructor(storage, options, customMergeHandler) {
     let { valueEncoding, name, metadata } = options
     let feed = hypercore(storage)
+    let peersListKey
     if (!metadata)
       options.metadata = metadata = {}
-
-    extend(options.metadata, {contentFeed: KEY_TO_PEERS})
+    else
+      peersListKey = metadata.contentFeed
+    // Save the key to peers in the head block
+    if (!peersListKey)
+      extend(options.metadata, {contentFeed: KEY_TO_PEERS})
 
     super(feed, options) // this creates the store
 
@@ -31,7 +35,6 @@ class MultiHyperbee extends Hyperbee {
 
   async init() {
     await this.ready()
-    this.clock = new Clock(new Timestamp(0, 0, this.feed.key.toString('hex')));
 
     let diffStorage
     let presistentStorage = typeof this.storage === 'string'
@@ -42,11 +45,35 @@ class MultiHyperbee extends Hyperbee {
 
     this.diffFeed = hypercore(diffStorage)
     this.diffHyperbee = new Hyperbee(this.diffFeed, this.options)
-    await this.diffHyperbee.ready()
-    if (presistentStorage)
-      await this.restorePeers()
-  }
 
+    await this.diffHyperbee.ready()
+
+    let peers = presistentStorage  &&  await this._restorePeers()
+
+    this.clock = await this._createClock(peers)
+  }
+  async _createClock(hasPeers) {
+    let keyString = this.feed.key.toString('hex')
+    let clock = new Clock(new Timestamp(0, 0, keyString))
+    if (!hasPeers)
+      return clock
+
+    let hs = this.createHistoryStream({gte: -1, limit: 1})
+    let entries
+    try {
+      entries = await this._collect(hs)
+    } catch (err) {
+      console.log('No entries found', err)
+    }
+    if (!entries  ||  !entries.length || !entries[0].value._timestamp)
+      return clock
+
+    let timestamp = entries[0].value._timestamp
+    let idx = timestamp.length - 5
+    let millis = new Date(timestamp.slice(0, idx)).getTime()
+    let counter = parseInt(timestamp.slice(idx + 1))
+    return new Clock(new Timestamp(millis, counter, keyString))
+  }
   async get(key) {
     await this._init
     return this._get(key)
@@ -107,13 +134,19 @@ class MultiHyperbee extends Hyperbee {
     return await this._addPeer(key)
   }
 
-  async restorePeers() {
+  async _restorePeers() {
+    let hs = this.feed.createReadStream({start: 0, end: 1})
+    let entries = await this._collect(hs)
+    let peerListKey = entries[0].toString().split('\n')[2]
+    this.peerListKey = peerListKey.replace(/[^a-zA-Z0-9_]/g, '')
+    debugger
+
     let peerList = await this._get(this.peerListKey)
     if (!peerList || !peerList.value ||  !peerList.value.length)
       return
+    let peersHB = []
     let keys = peerList.value
     let keyStrings = keys.map(key => key.toString('hex'))
-    let peersHB = []
     for (let i=0; i<keys.length; i++) {
       let key = keys[i]
       let keyString = keyStrings[i]
@@ -199,6 +232,9 @@ class MultiHyperbee extends Hyperbee {
 
     return peer
   }
+  // replicate(isInitiator, options) {
+  //   return this.diffFeed.replicate(isInitiator, options)
+  // }
   async _addRemovePeer(keyString, isAdd) {
     let peersList
     try {
@@ -238,14 +274,16 @@ class MultiHyperbee extends Hyperbee {
     const peer = this.sources[keyString]
     const peerFeed = peer.feed
     peerFeed.update(() => {
-// console.log(`UPDATE: ${peerFeed.key.toString('hex')}`)
+      if (peer.name)
+        console.log(`UPDATE: ${peer.name}`)
+ // console.log(`UPDATE: ${peerFeed.key.toString('hex')}`)
       let rs = peer.createHistoryStream({ gte: -1 })
       let newSeqs = []
       let values = []
       rs.on('data', async (data) => {
         let { key, seq, value } = data
         newSeqs.push(seq)
-        if (!value  &&  key.trim().replace(/[^a-zA-Z0-9_]/g, '') === KEY_TO_PEERS)
+        if (!value) //  &&  key.trim().replace(/[^a-zA-Z0-9_]/g, '') === KEY_TO_PEERS)
           return
 
         let {millis, counter, node} = this._parseTimestamp(value._timestamp)
@@ -262,6 +300,15 @@ class MultiHyperbee extends Hyperbee {
           await this.mergeHandler.merge(values[i])
       })
       this._update(keyString, newSeqs)
+    })
+  }
+  async _collect(stream) {
+    return new Promise((resolve, reject) => {
+      const entries = []
+      stream.on('data', d => entries.push(d))
+      stream.on('end', () => resolve(entries))
+      stream.on('error', err => reject(err))
+      stream.on('close', () => reject(new Error('Premature close')))
     })
   }
 }
