@@ -159,6 +159,6 @@ This algorithm ensures that all peers have the store in exactly the same state.
   - Multihyperbee has a manifest that contains the list of peers keys. 
   - The key to the manifest is saved in the header block of the MultiHyperbee Store. 
   - Peer keys are used to restore the peers in case of the restart. 
-### Discussions
-- update() event on replica occured and computer died before we applied it to store. Will it arrive again?
+- update() event on replica occured and computer died before we applied it to store. (Will it arrive again? - it does not)
+  - this needs a test that simulates crash before Diff(s) processed and checks that thei are processed on restart.
 
