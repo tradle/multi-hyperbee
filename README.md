@@ -57,6 +57,8 @@ class MergeHandler {
 
 ### await db.put(key, storeValue)
 
+```storeValue``` - should be a JSON object
+
 Put will write two objects at the same time to Store and to Diff hyperbee.
 Put will add to each of the objects following properties:
 
