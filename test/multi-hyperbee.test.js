@@ -22,7 +22,7 @@ test('Multihyperbee - value should be JSON object', async t => {
   }
   t.end()
 })
-test.skip('Multihyperbee - persistent storage, basic functionality', async t => {
+test('Multihyperbee - persistent storage, basic functionality', async t => {
   let storage = './test/mh/'
   // let { multiHBs, hasPeers, streams } = await setupReplChannel(2, storage)
   let { multiHBs } = await setupReplChannel(2, storage)
@@ -39,7 +39,7 @@ test.skip('Multihyperbee - persistent storage, basic functionality', async t => 
   await checkStoreAndDiff(t, multiHBs, storeArr, diffArr)
   t.end()
 })
-test.skip('Multihyperbee - auto-generate diff', async t => {
+test('Multihyperbee - auto-generate diff', async t => {
   const { multiHBs } = await setupReplChannel(2)
   const [ primary, secondary ] = multiHBs
 
