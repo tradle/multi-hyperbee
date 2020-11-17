@@ -12,7 +12,17 @@ const MultiHyperbee = require('../')
 var { object0, object1, object1_1, object2,
       diff0, diff1, diff1_1, diff2 } = require('./constants')
 
-test('Multihyperbee - persistent storage, basic functionality', async t => {
+test('Multihyperbee - value should be JSON object', async t => {
+  let { multiHBs } = await setupReplChannel(1)
+  let mh = multiHBs[0]
+  try {
+    await mh.put('key', 'value')
+  } catch(err) {
+    t.ok(err, /value expected to be JSON object/)
+  }
+  t.end()
+})
+test.skip('Multihyperbee - persistent storage, basic functionality', async t => {
   let storage = './test/mh/'
   // let { multiHBs, hasPeers, streams } = await setupReplChannel(2, storage)
   let { multiHBs } = await setupReplChannel(2, storage)
@@ -29,7 +39,7 @@ test('Multihyperbee - persistent storage, basic functionality', async t => {
   await checkStoreAndDiff(t, multiHBs, storeArr, diffArr)
   t.end()
 })
-test('Multihyperbee - auto-generate diff', async t => {
+test.skip('Multihyperbee - auto-generate diff', async t => {
   const { multiHBs } = await setupReplChannel(2)
   const [ primary, secondary ] = multiHBs
 
