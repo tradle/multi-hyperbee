@@ -91,6 +91,9 @@ class MultiHyperbee extends Hyperbee {
 
     if (!value)
       throw new Error('multi-hyperbee: value parameter is required')
+    if (!noDiff  &&  (typeof value !== 'object'  || value.constructor !== Object))
+      throw new Error('multi-hyperbee: value expected to be JSON object')
+
     if (!value._objectId)
       value._objectId = key
     let timestamp = value._timestamp
