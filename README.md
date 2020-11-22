@@ -26,8 +26,7 @@ const multiHyperbee = new MultiHyperbee(storage, hyperbeeOpts)
 ```
 
 ## API
-### const db = 
-ltiHyperbee(storage, [options], [customMergeHandler])
+### const db = MultiHyperbee(storage, [options], [customMergeHandler])
 
 creates a new MultiHyperbee with two single-writer hypercores: 
 - **Store** - a hyperbee into which we will store objects created/changed locally or received from peers. This hyperbee is not replicated to peers. Multi-hyperbee's main goal is to achieve convergence, that is to keep this store in exactly the same state as store on other peers. This can't happen synchronously as peers are not expected to be only all the time, but eventually.
