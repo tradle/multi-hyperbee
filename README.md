@@ -16,7 +16,7 @@ A LevelUP compatible leaderless multi-master database with eventual consistency,
 const MultiHyperbee = require('multi-hyperbee')
 
 const hyperbeeOpts = { keyEncoding: 'utf-8', valueEncoding: 'json' }
-const multiHyperbee = new MultiHyperbee(storage, { hyperbeeOpts })
+const multiHyperbee = new MultiHyperbee(storage, hyperbeeOpts)
 
 // Each app usually has its own key exchange mechanism with remote peers. So after exchange is completed, 
 // we will know the keys of the peer's diff feeds. To receive updates from them, you need to add them here. Repeat for all remote peers.
