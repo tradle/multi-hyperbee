@@ -112,6 +112,7 @@ class MergeHandler {
         this._insertObject(insert, p, newVal, oldVal)
         continue
       }
+      add[p] = newVal
     }
     for (let p in oldValue) {
       if (p.charAt(0) === '_')
