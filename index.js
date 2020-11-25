@@ -1,7 +1,11 @@
 const Hyperbee = require('hyperbee')
 const hypercore = require('hypercore')
-const { isEqual, size, extend } = require('lodash')
+const auth = require('hypercore-peer-auth')
+const Protocol = require('hypercore-protocol')
 const Union = require('sorted-union-stream')
+const pump = require('pump')
+const { isEqual, size, extend } = require('lodash')
+
 const Clock = require('./clock')
 const MergeHandler = require('./mergeHandler')
 const { Timestamp, MutableTimestamp } = require('./timestamp')()
@@ -145,6 +149,42 @@ class MultiHyperbee extends Hyperbee {
   async addPeer(key, allPeersKeyStrings) {
     await this._init
     return await this._addPeer(key)
+  }
+
+  async onConnection(socket, details) {
+    await this._init
+
+    console.log('(New peer connected!)')
+
+    const isInitiator = !!details.client
+    const protocol = new Protocol(isInitiator)
+
+    pump(socket, protocol, socket)
+    const { key, secretKey } = this.diffFeed
+
+    let peer
+    let self = this
+    auth(protocol, {
+      authKeyPair: {
+        publicKey: key,
+        secretKey
+      },
+      onauthenticate (peerAuthKey, cb) {
+        let peerAuthKeyStr = peerAuthKey.toString('hex')
+        const { sources } = self
+        for (const key in sources) {
+          if (key === peerAuthKeyStr) {
+            peer = sources[key]
+            return cb(null, true)
+          }
+        }
+        cb(null, false)
+      },
+      onprotocol: async (protocol) => {
+        await self.replicate(isInitiator, {stream: protocol, live: true})
+        peer.feed.replicate(!isInitiator, {stream: protocol, live: true})
+      }
+    })
   }
 
   async _restorePeers() {
