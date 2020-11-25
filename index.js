@@ -6,7 +6,7 @@ const Clock = require('./clock')
 const MergeHandler = require('./mergeHandler')
 const { Timestamp, MutableTimestamp } = require('./timestamp')()
 
-const KEY_TO_PEERS = '__peers'
+const RELATED_FEEDS = '__peers'
 // This implementation uses HLC Clock implemented by James Long in his crdt demo app
 class MultiHyperbee extends Hyperbee {
   constructor(storage, options, customMergeHandler) {
@@ -19,7 +19,7 @@ class MultiHyperbee extends Hyperbee {
       peersListKey = metadata.contentFeed
     // Save the key to peers in the head block
     if (!peersListKey)
-      extend(options.metadata, {contentFeed: KEY_TO_PEERS})
+      extend(options.metadata, {contentFeed: RELATED_FEEDS})
 
     super(feed, options) // this creates the store
 
@@ -44,7 +44,13 @@ class MultiHyperbee extends Hyperbee {
       diffStorage = this.storage // storage function chosen by user: could be ram, ras3, etc.
 
     this.diffFeed = hypercore(diffStorage)
-    this.diffHyperbee = new Hyperbee(this.diffFeed, this.options)
+
+    let options = { ...this.options }
+    options.metadata = {
+      contentFeed: 'multi-hyperbee-diff'
+    }
+
+    this.diffHyperbee = new Hyperbee(this.diffFeed, options)
 
     await this.diffHyperbee.ready()
 
@@ -142,7 +148,7 @@ class MultiHyperbee extends Hyperbee {
     let entries = await this._collect(hs)
     let peerListKey = entries[0].toString().split('\n')[2]
     this.peerListKey = peerListKey.replace(/[^a-zA-Z0-9_]/g, '')
-    debugger
+    // debugger
 
     let peerList = await this._get(this.peerListKey)
     if (!peerList || !peerList.value ||  !peerList.value.length)
@@ -235,9 +241,10 @@ class MultiHyperbee extends Hyperbee {
 
     return peer
   }
-  // replicate(isInitiator, options) {
-  //   return this.diffFeed.replicate(isInitiator, options)
-  // }
+  async replicate(isInitiator, options) {
+    await this._init
+    return this.diffFeed.replicate(isInitiator, options)
+  }
   async _addRemovePeer(keyString, isAdd) {
     let peersList
     try {
@@ -286,7 +293,7 @@ class MultiHyperbee extends Hyperbee {
       rs.on('data', async (data) => {
         let { key, seq, value } = data
         newSeqs.push(seq)
-        if (!value) //  &&  key.trim().replace(/[^a-zA-Z0-9_]/g, '') === KEY_TO_PEERS)
+        if (!value) //  &&  key.trim().replace(/[^a-zA-Z0-9_]/g, '') === RELATED_FEEDS)
           return
 
         let {millis, counter, node} = this._parseTimestamp(value._timestamp)
