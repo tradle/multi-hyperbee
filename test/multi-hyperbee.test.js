@@ -80,14 +80,12 @@ async function setupReplChannel(count, storage) {
     let cur = i
     let j = 0
     let multiHB = multiHBs[i]
-    let diffFeed = (await multiHB.getDiff()).feed
 
     for (; j<multiHBs.length; j++) {
       if (j === cur) continue
       let cloneFeeds = await multiHBs[j].getPeers()
       for (let ii=0; ii<cloneFeeds.length; ii++) {
-        let pstream = diffFeed.replicate(false, {live: true})
-        // let pstream = await multiHB.replicate(false, {live: true})
+        let pstream = await multiHB.replicate(false, {live: true})
         streams.push(pstream)
         let cstream = cloneFeeds[ii].feed.replicate(true, {live: true})
         streams.push(cstream)

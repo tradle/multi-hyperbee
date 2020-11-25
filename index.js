@@ -133,6 +133,10 @@ class MultiHyperbee extends Hyperbee {
     await this._init
     return await super.peek([options])
   }
+  async replicate(isInitiator, options) {
+    await this._init
+    return this.diffFeed.replicate(isInitiator, options)
+  }
   async getDiff() {
     await this._init
     return this.diffHyperbee
@@ -240,10 +244,6 @@ class MultiHyperbee extends Hyperbee {
     await this._update(keyString)
 
     return peer
-  }
-  async replicate(isInitiator, options) {
-    await this._init
-    return this.diffFeed.replicate(isInitiator, options)
   }
   async _addRemovePeer(keyString, isAdd) {
     let peersList
