@@ -65,7 +65,11 @@ async function startSwarm(db, topic) {
     announce: true
   })
 
-  swarm.on('connection', (socket, info) => db.onConnection(socket, info))
+  // swarm.on('connection', (socket, info) => db.onConnection(socket, info))
+  swarm.on('connection', async (socket, info) => {
+    let stream = await db.replicate(info.client, {stream: socket, info, live: true})
+    pump(socket, stream, socket)
+  })
 }
 
 function printUsage () {

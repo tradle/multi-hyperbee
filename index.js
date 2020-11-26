@@ -137,10 +137,6 @@ class MultiHyperbee extends Hyperbee {
     await this._init
     return await super.peek([options])
   }
-  async replicate(isInitiator, options) {
-    await this._init
-    return this.diffFeed.replicate(isInitiator, options)
-  }
   async getDiff() {
     await this._init
     return this.diffHyperbee
@@ -151,15 +147,19 @@ class MultiHyperbee extends Hyperbee {
     return await this._addPeer(key)
   }
 
-  async onConnection(socket, details) {
+  async replicate(isInitiator, options) {
     await this._init
+    const { stream, info } = options
+    if (!stream  ||  !info)
+      return this.diffFeed.replicate(isInitiator, options)
 
-    console.log('(New peer connected!)')
-
-    const isInitiator = !!details.client
+    return await this._joinMainStream(stream, info)
+  }
+  async _joinMainStream(stream, info) {
+    const isInitiator = !!info.client
     const protocol = new Protocol(isInitiator)
 
-    pump(socket, protocol, socket)
+    // pump(stream, protocol, stream)
     const { key, secretKey } = this.diffFeed
 
     let peer
@@ -181,10 +181,11 @@ class MultiHyperbee extends Hyperbee {
         cb(null, false)
       },
       onprotocol: async (protocol) => {
-        await self.replicate(isInitiator, {stream: protocol, live: true})
+        await self.diffFeed.replicate(isInitiator, {stream: protocol, live: true})
         peer.feed.replicate(!isInitiator, {stream: protocol, live: true})
       }
     })
+    return protocol
   }
 
   async _restorePeers() {
