@@ -6,9 +6,9 @@ const { promisify } = require('util')
 const auth = require('hypercore-peer-auth')
 const Protocol = require('hypercore-protocol')
 
-const { key, storage } = require('minimist')(process.argv.slice(2), {
+const { keys, storage } = require('minimist')(process.argv.slice(2), {
   alias: {
-    k: 'key',
+    k: 'keys',
     s: 'storage'
   }
 })
@@ -41,19 +41,23 @@ async function start() {
 
   let diffFeed = diffHyperbee.feed
   console.log(`${storage} diff key: ${diffFeed.key.toString('hex')}`)
-  if (!key || !key.length) {
+  if (!keys || !keys.length) {
     return false
   }
 
-  peer = await db.addPeer(key)
+  let keysArr = keys.split(',')
+
+
+  for (let i=0; i<keysArr.length; i++)
+    await db.addPeer(keysArr[i])
   process.stdin.on('data', async (data) => {
-    await db.put(`peer_${storage}`, {
-      text: data.toString('utf-8').trim(),
-    })
+    let text = data.toString('utf-8').trim()
+
+    await db.put(`${storage}_${text.replace(/[^a-zA-Z]/g, '')}`, { text })
   })
 
-  let rkey = `${storage}_123`
-  await db.put(rkey, data)
+  // let rkey = `${storage}_123`
+  // await db.put(rkey, data)
   await startSwarm(db, topicHex)
   return true
 }
