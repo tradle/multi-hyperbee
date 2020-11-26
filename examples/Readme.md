@@ -7,7 +7,7 @@
  using different storage name for different tabs. It will create directory structure for MultiHyperbee and print the **key** of the Diff Hyperbee.
  - run command 
  ```
- node examples/example.js -s [some storage name] -k [array of the keys of the Diff Hyperbees from other tabs]
+ node examples/example.js -s [some storage name] -k [array of the keys of the Diff Hyperbees from other tabs. Use comma as a delimiter]
  ```
 You can then enter some data (since the example uses stdin) and it'll create the object(s) from the entered data which are going to be replicated.
 
