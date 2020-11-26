@@ -24,6 +24,9 @@ const multiHyperbee = new MultiHyperbee(storage, hyperbeeOpts)
   await multiHyperbee.addPeer(peerDiffFeedKey)
 }  
 ```
+## Example
+
+See example [here](https://github.com/tradle/multi-hyperbee/tree/master/examples). 
 
 ## API
 ### const db = new MultiHyperbee(storage, [options], [customMergeHandler])
