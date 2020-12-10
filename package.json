@@ -30,12 +30,13 @@
     "sorted-union-stream": "^3.0.1"
   },
   "devDependencies": {
-    "hypercore-peer-auth": "git+https://github.com/Frando/hypercore-peer-auth.git",
-    "rimraf": "^3.0.2",
-    "hyperswarm": "^2.15.2",
     "crypto": "^1.0.1",
+    "hypercore-peer-auth": "git+https://github.com/Frando/hypercore-peer-auth.git",
+    "hyperswarm": "^2.15.2",
     "minimist": "^1.2.5",
     "random-access-memory": "^3.1.1",
-    "tape": "^5.0.1"
+    "rimraf": "^3.0.2",
+    "tape": "^5.0.1",
+    "why-is-node-running": "^2.2.0"
   }
 }
