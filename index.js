@@ -149,14 +149,13 @@ class MultiHyperbee extends Hyperbee {
 
   async replicate(isInitiator, options) {
     await this._init
-    const { stream, info } = options
-    if (!stream  ||  !info)
+    const { stream } = options
+    if (!stream)
       return this.diffFeed.replicate(isInitiator, options)
 
-    return await this._joinMainStream(stream, info)
+    return await this._joinMainStream(isInitiator, stream)
   }
-  async _joinMainStream(stream, info) {
-    const isInitiator = !!info.client
+  async _joinMainStream(isInitiator, stream) {
     const protocol = new Protocol(isInitiator)
 
     // pump(stream, protocol, stream)

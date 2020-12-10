@@ -49,15 +49,14 @@ async function start() {
 
 
   for (let i=0; i<keysArr.length; i++)
-    await db.addPeer(keysArr[i])
+    await db.addPeer(keysArr[i].trim())
   process.stdin.on('data', async (data) => {
     let text = data.toString('utf-8').trim()
-
     await db.put(`${storage}_${text.replace(/[^a-zA-Z]/g, '')}`, { text })
   })
 
-  // let rkey = `${storage}_123`
-  // await db.put(rkey, data)
+  let rkey = `${storage}_123`
+  await db.put(rkey, data)
   await startSwarm(db, topicHex)
   return true
 }
@@ -71,7 +70,7 @@ async function startSwarm(db, topic) {
 
   // swarm.on('connection', (socket, info) => db.onConnection(socket, info))
   swarm.on('connection', async (socket, info) => {
-    let stream = await db.replicate(info.client, {stream: socket, info, live: true})
+    let stream = await db.replicate(info.client, {stream: socket, live: true})
     pump(socket, stream, socket)
   })
 }
