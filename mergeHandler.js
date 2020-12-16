@@ -1,7 +1,5 @@
 const Automerge = require('automerge')
-const isEqual = require('lodash/isEqual')
-const extend = require('lodash/extend')
-const size = require('lodash/size')
+const { cloneDeep, size, extend, isEqual } = require('lodash')
 
 // MergeHandler must use store._put to notify MultiHyperbee that it does not need to
 // generate diff object in this case
@@ -16,34 +14,25 @@ class MergeHandler {
     let { _objectId: rkey, _prevTimestamp } = obj
 
     // let rkey = _objectId
-    let prevResource = await this.store.get(rkey)
+    let prevObject = await this.store.get(rkey)
 
-    prevResource = prevResource  &&  prevResource.value
-    let isNew = !prevResource  &&  !_prevTimestamp
+    prevObject = prevObject  &&  prevObject.value
+    // Not working when there is no object but there is _prevTimestamp
+    let isNewHere = !prevObject // &&  !_prevTimestamp
+    let isNewThere = !_prevTimestamp
 
-    if (!isNew  &&  !prevResource) {
-      debugger
-      return
-    }
-
-    if (isNew  ||  prevResource._timestamp === _prevTimestamp) {
-      const val = this._doMerge(prevResource, diff, isNew)
-      if (prevResource  &&  isEqual(val, prevResource)) {
+    if ((isNewHere && isNewThere) ||  (prevObject  &&  prevObject._timestamp === _prevTimestamp)) {
+      const val = this._doMerge(prevObject, diff, isNewHere)
+      if (prevObject  &&  isEqual(val, prevObject)) {
         debugger
         return
       }
       await this.store._put(rkey, val)
+// console.log('New object: ' + JSON.stringify(val, null, 2))
       return
     }
-    let query
+    let { tm, needEarlierObject } = this.getTimestampForUpdateQuery(prevObject, diff)
 
-    let tm, needEarlierObject
-    if (prevResource._timestamp < _timestamp)
-      tm = prevResource._timestamp
-    else {
-      tm = _timestamp
-      needEarlierObject = true
-    }
     let ukey = `${rkey}/${tm}`
     let unionStream = this.store.createUnionStream(ukey)
 
@@ -54,38 +43,130 @@ class MergeHandler {
       console.log(`Error updating with ${JSON.stringify(diff, null, 2)}`, err)
       return
     }
+    let origPrevObject
     if (needEarlierObject) {
-      debugger
-      let objTimestamp = entries[0].value()._timestamp
-
-      let hist = this.store.createHistoryStream({gte: rkey, lte: rkey})
-      let objects = await this.collect(hist)
-      let vobj = objects.find(obj => obj.value._timestamp === objTimestamp)
-      prevResource = vobj.value
+      if (!entries.length) {
+        await this.handleEarlierObject(entries, prevObject, diff)
+        return
+      }
+      origPrevObject = prevObject
+      prevObject = await this.findStartingObject(prevObject, entries)
     }
 
     entries = entries.map(e => e.value)
-    entries.push(diff)
-    entries.sort((a, b) => new Date(a._timestamp).getTime() - new Date(b._timestamp).getTime())
+    let idx = entries.find(e => e._timestamp === diff._timestamp)
+    if (idx === -1)
+      entries.push(diff)
+    entries.sort((a, b) => this.getTime(a._timestamp) - this.getTime(b._timestamp))
 
     for (let i=0; i<entries.length; i++) {
       let value = entries[i]
-      let updatedValue = this._doMerge(prevResource, value)
-      if (prevResource  &&  isEqual(updatedValue, prevResource)) {
+      let updatedValue = this._doMerge(prevObject, value)
+      if (prevObject  &&  isEqual(updatedValue, prevObject)) {
         debugger
+        // continue
+      }
+// console.log('Updated object: ' + JSON.stringify(updatedValue, null, 2))
+      await this.store._put(rkey, updatedValue)
+      prevObject = updatedValue
+    }
+  }
+  getTime(timestamp) {
+    let idx = timestamp.length - 5
+    return new Date(timestamp.slice(0, idx)).getTime()
+  }
+  getTimestampForUpdateQuery(prevObject, diff) {
+    let { _timestamp, obj } = diff
+    let { _prevTimestamp } = obj
+
+    if (!prevObject)
+      return { tm: '' }
+    // Diff for update
+    if (_prevTimestamp) {
+      if (prevObject._timestamp < _prevTimestamp)
+        return { tm: prevObject._timestamp }
+      if (prevObject._prevTimestamp  &&  prevObject._prevTimestamp === _prevTimestamp) {
+        if (prevObject._timestamp < _timestamp)
+          return { tm: _prevTimestamp }
+
+        let needEarlierObject = true
+        if (_timestamp < prevObject._prevTimestamp)
+          return { tm: _timestamp, needEarlierObject }
+        return { tm: _prevTimestamp, needEarlierObject }
+      }
+      else
+        return { tm: _prevTimestamp }
+    }
+    // Diff for creating a new Object
+    if (prevObject._timestamp < _timestamp)
+      return { tm: prevObject._timestamp }
+
+    let needEarlierObject = true
+    if (_timestamp < prevObject._prevTimestamp)
+      return { tm: _timestamp, needEarlierObject }
+    return { tm: _prevTimestamp, needEarlierObject }
+  }
+  async findStartingObject(prevObject, entries) {
+    let { value } = entries[0]
+    let entryTimestamp = value.obj._prevTimestamp || value._timestamp
+    while (true) {
+      let prevSeq = prevObject._prevSeq
+      if (!prevSeq)
+        break
+      let hist = this.store.createHistoryStream({gte: prevSeq, lte: prevSeq})
+      let objects = await this.collect(hist)
+      if (!objects.length) {
+        debugger
+        break
+      }
+      let objTimestamp = objects[0].value._timestamp
+      prevObject = objects[0].value
+      if (objTimestamp === entryTimestamp)
+        break
+
+      if (objTimestamp > entryTimestamp)
+        continue
+      else {
+        debugger
+        break
+      }
+    }
+    return prevObject
+  }
+  async handleEarlierObject(entries, prevObject, diff) {
+    debugger
+
+    let { _objectId: rkey, _prevTimestamp } = diff.obj
+    let isNewThere = !_prevTimestamp
+    if (prevObject) {
+      if (isNewThere) {
+        const newThere = this._doMerge(null, diff, true)
+        await this.store._put(rkey, newThere, true)
+        const pdiff = this.genDiff(prevObject, newThere)
+        const updatedValue = this._doMerge(newThere, pdiff)
+        await this.store._put(rkey, updatedValue)
         return
       }
-      await this.store._put(rkey, updatedValue)
-      prevResource = updatedValue
+      debugger
+      return
     }
+    if (isNewThere) {
+      debugger
+      // create object from the received diff
+      const val = this._doMerge(prevObject, diff, true)
+      await this.store._put(rkey, val)
+      return
+    }
+    debugger
+    throw new Error('This should not have happen')
   }
 
   /*
   Generates diff object according to diffSchema
    */
-  genDiff(newValue, oldValue) {
-    if (!oldValue)
-      oldValue = {}
+  genDiff(newV, oldV) {
+    let oldValue = oldV ? cloneDeep(oldV) : {}
+    let newValue = newV
     let add = {}
     let insert = {}
     let remove = {}
@@ -210,10 +291,18 @@ class MergeHandler {
   async collect(stream) {
     return new Promise((resolve, reject) => {
       const entries = []
-      stream.on('data', d => entries.push(d))
-      stream.on('end', () => resolve(entries))
-      stream.on('error', err => reject(err))
-      stream.on('close', () => reject(new Error('Premature close')))
+      stream.on('data', d => {
+        entries.push(d)
+      })
+      stream.on('end', () => {
+        resolve(entries)
+      })
+      stream.on('error', err => {
+        reject(err)
+      })
+      stream.on('close', () => {
+        reject(new Error('Premature close'))
+      })
     })
   }
   _doMerge(resource, diff, isNew) {
@@ -315,3 +404,42 @@ class MergeHandler {
 }
 module.exports = MergeHandler
 
+/*
+  getTimestampForUpdateQuery(prevObject, diff) {
+    let { obj, _timestamp } = diff
+    let { _prevTimestamp } = obj
+
+    if (!prevObject)
+      return { timestamp: '' }
+    // Diff for update
+    let needEarlierObject = true
+    if (_prevTimestamp) {
+      if (prevObject._timestamp < _prevTimestamp)
+        return { timestamp: prevObject._timestamp }
+      // prevObject is a new Object here, so get all diffs
+      if (!prevObject._prevTimestamp)
+        return { timestamp: '', needEarlierObject }
+
+      if (prevObject._prevTimestamp > _prevTimestamp)
+        return { timestamp: _prevTimestamp, needEarlierObject }
+
+      if (prevObject._prevTimestamp < _prevTimestamp)
+        return { timestamp: prevObject._prevTimestamp }
+
+      if (prevObject._prevTimestamp === _prevTimestamp) {
+        if (prevObject._timestamp > _timestamp)
+          return { timestamp: _prevTimestamp, needEarlierObject }
+        else
+          return { timestamp: _prevTimestamp }
+      }
+      else
+        return { timestamp: _prevTimestamp, needEarlierObject }
+    }
+    // Diff for creating a new Object
+    if (prevObject._timestamp < _timestamp)
+      return { timestamp: prevObject._timestamp }
+    else
+      return { timestamp: _timestamp, needEarlierObject }
+  }
+
+ */
