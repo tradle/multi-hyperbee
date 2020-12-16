@@ -92,7 +92,7 @@ class MultiHyperbee extends Hyperbee {
     await this._init
     await super.del(key)
   }
-  async put(key, value, noDiff) {
+  async put(key, value, noDiff, isNew) {
     await this._init
     if (key === this.peerListKey) {
       super.put(key, value)
@@ -111,12 +111,19 @@ class MultiHyperbee extends Hyperbee {
       timestamp = Timestamp.send(this.clock.getClock()).toString().slice(0, 29)
     let diff = value._diff
     delete value._diff
-    let cur = await this.get(key)
+
+    let cur = !isNew  && await this.get(key)
 
     value._timestamp = timestamp
-    const prevTimestamp = cur && cur.value._timestamp
+    let prevTimestamp, prevSeq
+    if (cur) {
+      prevTimestamp = cur.value._timestamp
+      prevSeq = cur.seq
+    }
     if (prevTimestamp)
       value._prevTimestamp = prevTimestamp
+    if (prevSeq)
+      value._prevSeq = prevSeq
 
     await super.put(key, value)
     if (diff) {
@@ -231,12 +238,13 @@ class MultiHyperbee extends Hyperbee {
     if (!key)
       throw new Error('Key is expected')
     let sortedStreams = []
+    let lte = `${key.split('/').slice(0, -1).join('/')}/\uffff`
+    let query = { gte: key, lte }
     for (let s in this.sources) {
       let hb  = this.sources[s]
-      sortedStreams.push(
-        hb.createReadStream({ gte: key, lte: key.split('/').splice(0, -1).join('/') })
-      )
+      sortedStreams.push(hb.createReadStream(query))
     }
+    sortedStreams.push(this.diffHyperbee.createReadStream(query))
     if (sortedStreams.length === 1)
       return sortedStreams[0]
     let union
@@ -254,8 +262,8 @@ class MultiHyperbee extends Hyperbee {
   async _get(key) {
     return super.get(key)
   }
-  async _put(key, value) {
-    await this.put(key, value, true)
+  async _put(key, value, isNew) {
+    await this.put(key, value, true, isNew)
   }
   async _addPeer(key, allPeersKeyStrings) {
     const keyString = key.toString('hex')

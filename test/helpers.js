@@ -69,6 +69,7 @@ const helpers = {
           let { value } = data
           delete value._timestamp
           delete value._prevTimestamp
+          delete value._prevSeq
           let v = storeArr.find(val => isEqual(val, value))
           t.same(value, v)
           counter--
@@ -91,6 +92,7 @@ const helpers = {
             console.log(multiHB.name + 'Diff ' + JSON.stringify(value, null, 2))
           delete value._timestamp
           delete value.obj._prevTimestamp
+          delete value._prevSeq
           t.same(value, diffArr[0])
           diffArr.shift()
         })
