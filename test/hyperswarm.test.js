@@ -51,7 +51,8 @@ test('Multihyperbee - connected via hyperswarm', async t => {
       const { key, value } = entry[`Peer ${i}`]
       if (key === '__peers')
         return
-
+      delete value._prevSeq
+      delete cmpObj[0]._prevSeq
       t.same(value, cmpObj[0])
       cmpObj.shift()
       // console.log(entry)
@@ -59,18 +60,51 @@ test('Multihyperbee - connected via hyperswarm', async t => {
   }
   // setTimeout(log, 1000)
   await delay(2000)
-  t.pass('done with test')
-  // swarms.forEach(swarm => {
-  //   t.same(swarm.connections.size, 2)
-  // })
-  // rmdir(storage, error => {
-  //   if (error)
-  //     console.log(`Error deleting directory ${storage}`, error)
-  //   else
-  //     console.log(`directory ${storage} was successfully deleted`)
-  // })
+  // t.pass('done with test')
   t.end()
 })
+test('Multihyperbee - connected via hyperswarm - create object with the same key on 2 devices', async t => {
+  let storage = './test/mht2/'
+  let { multiHBs } = await setup(2, storage)
+  let streams = []
+  for (let i=0; i<multiHBs.length; i++) {
+    let cur = i
+    let j = 0
+    let multiHB = multiHBs[i]
+    let diffFeed = (await multiHB.getDiff()).feed
+    for (; j<multiHBs.length; j++) {
+      if (j === cur) continue
+      await multiHBs[j].addPeer(diffFeed.key)
+    }
+  }
+  const [ one, two ] = multiHBs
+  let swarms = []
+  for (let i=0; i<multiHBs.length; i++) {
+    swarms.push(startSwarm(multiHBs[i], i))
+  }
+
+  for (let i=0; i<multiHBs.length; i++) {
+    await multiHBs[i].put('sameKey', object0)
+    await delay(1000)
+  }
+  delete object0._prevSeq
+  await delay(2000)
+  for (let i=0; i<multiHBs.length; i++) {
+    let entries = await logFeed(multiHBs[i], i)
+    entries.forEach(entry => {
+      const { key, value } = entry[`Peer ${i}`]
+      if (key === '__peers')
+        return
+
+      delete value._prevSeq
+      t.same(value, object0)
+    })
+  }
+  await delay(2000)
+  // t.pass('done with test 2')
+  t.end()
+})
+
 test.onFinish(async () => {
   await delay(2000)
   swarms.forEach(swarm => swarm.destroy())

@@ -22,7 +22,7 @@ test('Multihyperbee - restore peers, restore HLC clock, cleanup peers', async t 
 })
 
 function rmstorage() {
-  let storages = ['./test/mh/', './test/mht/']
+  let storages = ['./test/mh/', './test/mht/', './test/mht2']
   storages.forEach(storage => {
     rmdir(storage, error => {
       if (error)
